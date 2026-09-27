@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.2.0
+// @version      0.2.1
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -30,6 +30,7 @@
   const html = `<style>
     #ri-open{position:fixed;right:12px;bottom:75px;z-index:2147483646;background:#263d69;color:#fff;border:1px solid #8db8ff;border-radius:50%;width:46px;height:46px;font-weight:bold;cursor:pointer}
     #ri-panel{position:fixed;inset:5% max(8px,calc((100vw - 690px)/2));z-index:2147483647;background:#14213a;color:#eef3fa;border:1px solid #557bb7;border-radius:12px;padding:18px;overflow:auto;box-shadow:0 8px 40px #000c;font:14px system-ui}
+    #ri-panel[hidden]{display:none!important}
     #ri-panel *{box-sizing:border-box}#ri-panel button,#ri-panel input,#ri-panel select{font:inherit}#ri-panel button{padding:8px;margin:3px;background:#305493;color:white;border:1px solid #799ad2;border-radius:6px;cursor:pointer}
     #ri-panel input,#ri-panel select{background:#eef3fa;color:#14213a;padding:7px;border-radius:5px;max-width:100%}#ri-panel table{width:100%;border-collapse:collapse}#ri-panel td,#ri-panel th{padding:6px;border-bottom:1px solid #445774;text-align:left}#ri-panel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}#ri-panel .muted{color:#b9c7de}#ri-panel .wheel{height:200px;width:200px;margin:12px auto;border-radius:50%;border:10px solid #f1be52;background:conic-gradient(#447ac2 0 25%,#e7a949 25% 50%,#578dca 50% 75%,#e9b75b 75%);display:grid;place-items:center;text-align:center;font-size:20px;font-weight:bold;transition:transform 3s cubic-bezier(.12,.82,.17,1)}#ri-panel .wheel span{background:#14213a;padding:8px;border-radius:8px;max-width:145px;overflow-wrap:anywhere}
   </style><button id="ri-open" title="RaffleIQ">R</button><section id="ri-panel" hidden></section>`;
@@ -41,7 +42,7 @@
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.1</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
