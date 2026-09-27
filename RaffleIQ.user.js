@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.2.2
+// @version      0.2.3
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -33,17 +33,17 @@
     #ri-panel{position:fixed;inset:5% max(8px,calc((100vw - 690px)/2));z-index:2147483647;background:#14213a;color:#eef3fa;border:1px solid #557bb7;border-radius:12px;padding:18px;overflow:auto;box-shadow:0 8px 40px #000c;font:14px system-ui}
     #ri-panel[hidden]{display:none!important}
     #ri-panel *{box-sizing:border-box}#ri-panel button,#ri-panel input,#ri-panel select{font:inherit}#ri-panel button{padding:8px;margin:3px;background:#305493;color:white;border:1px solid #799ad2;border-radius:6px;cursor:pointer}
-    #ri-panel input,#ri-panel select{background:#eef3fa;color:#14213a;padding:7px;border-radius:5px;max-width:100%}#ri-panel table{width:100%;border-collapse:collapse}#ri-panel td,#ri-panel th{padding:6px;border-bottom:1px solid #445774;text-align:left}#ri-panel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}#ri-panel .muted{color:#b9c7de}#ri-panel .wheel{height:200px;width:200px;margin:12px auto;border-radius:50%;border:10px solid #f1be52;background:conic-gradient(#447ac2 0 25%,#e7a949 25% 50%,#578dca 50% 75%,#e9b75b 75%);display:grid;place-items:center;text-align:center;font-size:20px;font-weight:bold;transition:transform 3s cubic-bezier(.12,.82,.17,1)}#ri-panel .wheel span{background:#14213a;padding:8px;border-radius:8px;max-width:145px;overflow-wrap:anywhere}
+    #ri-panel input,#ri-panel select{background:#eef3fa;color:#14213a;padding:7px;border-radius:5px;max-width:100%}#ri-panel table{width:100%;border-collapse:collapse}#ri-panel td,#ri-panel th{padding:6px;border-bottom:1px solid #445774;text-align:left}#ri-panel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}#ri-panel .muted{color:#b9c7de}#ri-panel .wheel{height:200px;width:200px;margin:12px auto;border-radius:50%;border:10px solid #f1be52;background:conic-gradient(#447ac2 0 25%,#e7a949 25% 50%,#578dca 50% 75%,#e9b75b 75%);display:grid;place-items:center;text-align:center;font-size:20px;font-weight:bold;transition:transform 3s cubic-bezier(.12,.82,.17,1)}#ri-panel .wheel span{background:#14213a;padding:8px;border-radius:8px;max-width:145px;overflow-wrap:anywhere}#ri-panel .ri-suggest{max-height:140px;overflow:auto}#ri-panel .ri-suggest button{display:block;width:100%;margin:2px 0;text-align:left}
   </style><button id="ri-open" title="RaffleIQ">R</button><section id="ri-panel" hidden></section>`;
   const host = document.createElement('div'); host.innerHTML = html; document.body.append(host);
   const panel = host.querySelector('#ri-panel');
-  const itemRows = r => r.items.map((i,n) => `<tr><td><input data-item="${n}" data-field="name" value="${esc(i.name)}"></td><td><input data-item="${n}" data-field="bundle" type="number" min="1" value="${i.bundle}" style="width:85px"></td><td><input data-item="${n}" data-field="cap" type="number" min="0" value="${i.cap}" style="width:85px"></td></tr>`).join('');
+  const itemRows = r => r.items.map((i,n) => `<tr><td><input data-item="${n}" data-field="name" autocomplete="off" value="${esc(i.name)}"><div class="ri-suggest"></div></td><td><input data-item="${n}" data-field="bundle" type="number" min="1" value="${i.bundle}" style="width:85px"></td><td><input data-item="${n}" data-field="cap" type="number" min="0" value="${i.cap}" style="width:85px"></td></tr>`).join('');
   const drawEntries = r => r.receipts.filter(x => x.entries > 0);
   const tickets = r => drawEntries(r).reduce((n,x) => n+x.entries,0);
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.2</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.3</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -60,6 +60,19 @@
       m.querySelector('#ri-create-key').onclick=()=>{window.location.href=KEY_BUILDER;};
       m.querySelector('#ri-set-key').onclick=()=>{const k=m.querySelector('#ri-key').value.trim();if(k){localStorage.setItem(KEY,k);m.querySelector('#ri-key').value='';status('Key saved locally.');}};
       m.querySelector('#ri-clear-key').onclick=()=>{localStorage.removeItem(KEY);status('Key removed.');};
+      if(r) {
+        const key=localStorage.getItem(KEY);
+        if(key&&!Object.keys(catalog).length)loadCatalog(key).catch(err=>status('Item suggestions unavailable: '+err.message));
+        m.querySelectorAll('[data-field=name]').forEach(input=>input.addEventListener('input',()=>{
+          const box=input.nextElementSibling,query=itemName(input.value);
+          box.replaceChildren();
+          if(query.length<3)return;
+          Object.values(catalog).filter(name=>itemName(name).includes(query)).slice(0,8).forEach(name=>{
+            const option=document.createElement('button');option.type='button';option.textContent=name;
+            option.onclick=()=>{input.value=name;box.replaceChildren();};box.append(option);
+          });
+        }));
+      }
       if(r) m.querySelector('#ri-items-save').onclick=()=>{if(r.receipts.length)return status('Rules are locked after the first transfer. Create a new raffle to change them.');const items=[...m.querySelectorAll('tr')].slice(1).map(tr=>({name:tr.querySelector('[data-field=name]').value.trim(),bundle:number(tr.querySelector('[data-field=bundle]').value),cap:number(tr.querySelector('[data-field=cap]').value)}));if(items.some(i=>!i.name||!i.bundle)||new Set(items.map(i=>itemName(i.name))).size!==items.length)return status('Item names must be unique and bundle sizes positive.');r.items=items;save();status('Items saved.');};
       m.querySelector('#ri-export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'raffleiq-v1',state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='RaffleIQ-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);};
       m.querySelector('#ri-import').onchange=async e=>{try{const raw=JSON.parse(await e.target.files[0].text());if(raw.format!=='raffleiq-v1'||!Array.isArray(raw.state?.raffles))throw Error('Unsupported backup');if(!confirm('Replace all local raffle history with this backup?'))return;state=raw.state;save();render();}catch(err){status('Import failed: '+err.message);}};
