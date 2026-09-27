@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- Added an editable raffle announcement with prize, item bundles, quantities, tickets, raffle code, and start/end times in TCT. Copying the message does not post to Torn.
+- Scheduled start/end times now control transfer eligibility and permit a final sync at the scheduled end.
+
 ## 0.2.4
 
 - Fixed incoming item receipts returned as a list of item objects. Recheck the full raffle period after a receipt parsing error, so the same transfer can be imported on the next sync.
