@@ -1,5 +1,13 @@
 # Changelog
 
-## 0.1.0 preview
+## 0.2.0
 
-- Added standalone TornPDA raffle dashboard, exact code filter, local receipt tracking, partial balances, item caps, weighted multiwinner wheel, history, and backup import/export.
+- Added multi-page incoming log scanning, automatic sync while Torn is visible, player name lookup and editable display names.
+- Added entry cutoff and required final sync before drawing.
+- Made the wheel's ticket slices and landing position match the selected ticket.
+- Locked raffle pricing after the first contribution and added a receipt review warning.
+- Kept backup and local data separate from the API key.
+
+## 0.1.0
+
+- Initial standalone preview.
