@@ -10,12 +10,13 @@ The six example bundles are Flash Grenade 200, HEG 330, Smoke Grenade 61, Empty 
 
 ## Raffle flow
 
-1. Give entrants the exact code. Case and outside spaces are ignored; additional words do not match.
-2. The script reads incoming item receipts from Torn's API every five minutes while the Torn page is visible. Use **Sync incoming transfers** to refresh on demand.
-3. Approved quantities accumulate by sender ID and item type. Different item types never combine. One qualifying bundle earns one ticket. Partial quantities carry toward that item's next bundle; caps limit credit across separate transfers.
-4. Check Contributions and Participants. The script resolves player names via the API when the key permits it, and names can be corrected locally. The Torn player ID remains the identity key.
-5. Press **Close entries**, then **Final sync**. The draw unlocks only when the final scan finishes with no unrecognized coded receipt. Choose a winner count and whether repeat players are allowed. The wheel gives each eligible ticket one equal slice and records its winning ticket and player.
-6. Export a backup after the raffle and drawing, then archive it.
+1. Open **Announcement** to enter the prize and start/end dates in your device's local time. The announcement displays Torn City Time (TCT). Edit the generated text as you like, then copy it to post yourself. Regenerate draft when you want to replace edits with the latest raffle details. The start time locks after a transfer is recorded.
+2. Give entrants the exact code. Case and outside spaces are ignored; additional words do not match. Only transfers inside the saved start/end window qualify.
+3. The script reads incoming item receipts from Torn's API every five minutes while the Torn page is visible. Use **Sync incoming transfers** to refresh on demand.
+4. Approved quantities accumulate by sender ID and item type. Different item types never combine. One qualifying bundle earns one ticket. Partial quantities carry toward that item's next bundle; caps limit credit across separate transfers.
+5. Check Contributions and Participants. The script resolves player names via the API when the key permits it, and names can be corrected locally. The Torn player ID remains the identity key.
+6. At the scheduled end, press **Final sync**, or press **Close entries** early and then **Final sync**. The draw unlocks only when the final scan finishes with no unrecognized coded receipt. Choose a winner count and whether repeat players are allowed. The wheel gives each eligible ticket one equal slice and records its winning ticket and player.
+7. Export a backup after the raffle and drawing, then archive it.
 
 The importer deduplicates Torn log ID plus item ID, scans additional pages when the API returns its page limit, and refuses to draw if complete coverage cannot be verified. Each receipt's ticket count stays fixed even if the item market value changes. Names and backup data stay on this device. The API key is stored separately and excluded from backup files. If TornPDA is closed, the script cannot monitor until it is opened again.
 
