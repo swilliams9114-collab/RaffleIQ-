@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.2.4
+// @version      0.3.0
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -33,7 +33,7 @@
     #ri-panel{position:fixed;inset:5% max(8px,calc((100vw - 690px)/2));z-index:2147483647;background:#14213a;color:#eef3fa;border:1px solid #557bb7;border-radius:12px;padding:18px;overflow:auto;box-shadow:0 8px 40px #000c;font:14px system-ui}
     #ri-panel[hidden]{display:none!important}
     #ri-panel *{box-sizing:border-box}#ri-panel button,#ri-panel input,#ri-panel select{font:inherit}#ri-panel button{padding:8px;margin:3px;background:#305493;color:white;border:1px solid #799ad2;border-radius:6px;cursor:pointer}
-    #ri-panel input,#ri-panel select{background:#eef3fa;color:#14213a;padding:7px;border-radius:5px;max-width:100%}#ri-panel table{width:100%;border-collapse:collapse}#ri-panel td,#ri-panel th{padding:6px;border-bottom:1px solid #445774;text-align:left}#ri-panel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}#ri-panel .muted{color:#b9c7de}#ri-panel .wheel{height:200px;width:200px;margin:12px auto;border-radius:50%;border:10px solid #f1be52;background:conic-gradient(#447ac2 0 25%,#e7a949 25% 50%,#578dca 50% 75%,#e9b75b 75%);display:grid;place-items:center;text-align:center;font-size:20px;font-weight:bold;transition:transform 3s cubic-bezier(.12,.82,.17,1)}#ri-panel .wheel span{background:#14213a;padding:8px;border-radius:8px;max-width:145px;overflow-wrap:anywhere}#ri-panel .ri-suggest{max-height:140px;overflow:auto}#ri-panel .ri-suggest button{display:block;width:100%;margin:2px 0;text-align:left}
+    #ri-panel input,#ri-panel select,#ri-panel textarea{background:#eef3fa;color:#14213a;padding:7px;border-radius:5px;max-width:100%}#ri-panel textarea{width:100%;min-height:330px;font:14px system-ui}#ri-panel table{width:100%;border-collapse:collapse}#ri-panel td,#ri-panel th{padding:6px;border-bottom:1px solid #445774;text-align:left}#ri-panel .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}#ri-panel .muted{color:#b9c7de}#ri-panel .wheel{height:200px;width:200px;margin:12px auto;border-radius:50%;border:10px solid #f1be52;background:conic-gradient(#447ac2 0 25%,#e7a949 25% 50%,#578dca 50% 75%,#e9b75b 75%);display:grid;place-items:center;text-align:center;font-size:20px;font-weight:bold;transition:transform 3s cubic-bezier(.12,.82,.17,1)}#ri-panel .wheel span{background:#14213a;padding:8px;border-radius:8px;max-width:145px;overflow-wrap:anywhere}#ri-panel .ri-suggest{max-height:140px;overflow:auto}#ri-panel .ri-suggest button{display:block;width:100%;margin:2px 0;text-align:left}
   </style><button id="ri-open" title="RaffleIQ">R</button><section id="ri-panel" hidden></section>`;
   const host = document.createElement('div'); host.innerHTML = html; document.body.append(host);
   const panel = host.querySelector('#ri-panel');
@@ -41,10 +41,18 @@
   const drawEntries = r => r.receipts.filter(x => x.entries > 0);
   const tickets = r => drawEntries(r).reduce((n,x) => n+x.entries,0);
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
+  const localInputTime = seconds => {const d=new Date(seconds*1000);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
+  const tornTime = seconds => new Date(seconds*1000).toLocaleString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})+' TCT';
+  const startTime = r => r.startAt || Math.floor(r.created/1000);
+  const endTime = r => Math.min(r.closedAt||Infinity,r.endAt||Infinity,Math.floor(Date.now()/1000));
+  function announcement(r){
+    const lines=r.items.map(i=>`• ${i.name}: ${i.bundle} = 1 ticket${i.cap?` (maximum ${i.cap} credited per player)`:''}`);
+    return `🎟️ It's raffle time: ${r.name}!\n\n🏆 Prize: ${r.prize||'[add your prize]'}\n🕒 Starts: ${tornTime(startTime(r))}\n⏰ Ends: ${r.endAt?tornTime(r.endAt):'[set an end date and time]'}\n\nSend these item bundles to the raffle host:\n${lines.join('\n')}\n\n📨 Put exactly ${r.code} in the transfer message. That's your entry code! Different item types cannot be combined, but partial quantities of the same item carry forward. Every complete bundle earns one ticket. Stack those chances and let the raffle magic begin! 🍀`;
+  }
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.4</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
-    <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.3.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
     tab('dashboard');
@@ -52,8 +60,8 @@
   function tab(name) {
     const r = active(), m = panel.querySelector('#ri-main');
     if (name === 'dashboard') {
-      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.closedAt?'Entries closed; run final sync before drawing.':'Entries open.'}</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.closedAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
-      if (r) { m.querySelector('#ri-sync').onclick = sync;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(Math.floor(r.created/1000),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
+      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
+      if (r) { m.querySelector('#ri-sync').onclick = sync;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
       m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Approved items</h3><p>Cap is maximum credited quantity per player across this raffle. Zero means unlimited. Partial quantities accumulate within the same item.</p><table><tr><th>Item name</th><th>Per ticket</th><th>Cap</th></tr>${itemRows(r)}</table><button id="ri-items-save">Save items</button>`:''}<h3>Backup</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label>`;
@@ -83,6 +91,21 @@
       const ids=[...new Set(r.receipts.map(x=>x.sender))];
       m.innerHTML=`<h3>Participants</h3><p class="muted">Names are fetched on sync where your key permits it. You can correct a display name here; identity and limits always use the Torn player ID.</p><table><tr><th>Torn ID</th><th>Display name</th><th>Tickets</th></tr>${ids.map(id=>`<tr><td>${esc(id)}</td><td><input data-player="${esc(id)}" value="${esc(state.names[id]||'')}"></td><td>${r.receipts.filter(x=>x.sender===id).reduce((n,x)=>n+x.entries,0)}</td></tr>`).join('')}</table><button id="ri-save-names">Save names</button>`;
       m.querySelector('#ri-save-names').onclick=()=>{m.querySelectorAll('[data-player]').forEach(input=>{const value=input.value.trim().slice(0,40);if(value)state.names[input.dataset.player]=value;else delete state.names[input.dataset.player];});save();status('Names saved.');};
+    } else if (name === 'announcement') {
+      if(!r)return void (m.innerHTML='<p>Create a raffle first.</p>');
+      m.innerHTML=`<h3>Raffle announcement</h3><p class="muted">Enter dates in your device's local time. The draft displays Torn City Time (TCT). Save details before copying.</p><div class="row"><label>Prize <input id="ri-prize" value="${esc(r.prize||'')}" placeholder="What can the winner win?"></label><label>Starts <input id="ri-start" type="datetime-local" value="${localInputTime(startTime(r))}" ${r.receipts.length||r.closedAt?'disabled':''}></label><label>Ends <input id="ri-end" type="datetime-local" value="${r.endAt?localInputTime(r.endAt):''}" ${r.closedAt?'disabled':''}></label></div><p class="muted">${r.receipts.length?'The start is locked because transfers have already been recorded.':''}</p><button id="ri-save-details">Save details</button><h3>Edit your announcement</h3><textarea id="ri-announcement"></textarea><div class="row"><button id="ri-regenerate">Regenerate draft</button><button id="ri-copy">Copy announcement</button></div><p class="muted">Regenerating replaces your edits. Copying does not post anything to Torn.</p>`;
+      const area=m.querySelector('#ri-announcement');area.value=r.announcementEdited?r.announcementText||'':announcement(r);
+      area.oninput=()=>{r.announcementText=area.value;r.announcementEdited=true;save();};
+      m.querySelector('#ri-save-details').onclick=()=>{
+        const prize=m.querySelector('#ri-prize').value.trim(),start=Date.parse(m.querySelector('#ri-start').value),end=Date.parse(m.querySelector('#ri-end').value);
+        if(!prize||!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return status('Enter a prize and valid start/end times; end must be after start.');
+        if(r.receipts.length&&end/1000<Math.max(...r.receipts.map(x=>x.time)))return status('The end cannot be before an already recorded transfer.');
+        if(r.finalSync&&r.endAt&&end>r.endAt*1000)return status('The raffle has already completed its final sync.');
+        r.prize=prize;if(!r.receipts.length&&!r.closedAt)r.startAt=Math.floor(start/1000);if(!r.closedAt)r.endAt=Math.floor(end/1000);
+        r.finalSync=false;save();if(!r.announcementEdited)area.value=announcement(r);status(r.announcementEdited?'Details saved. Regenerate the draft to include them in your edited text.':'Details saved and announcement updated.');
+      };
+      m.querySelector('#ri-regenerate').onclick=()=>{area.value=announcement(r);r.announcementText=area.value;r.announcementEdited=false;save();status('Draft regenerated.');};
+      m.querySelector('#ri-copy').onclick=async()=>{if(!r.prize||!r.endAt)return status('Save the prize and end time before copying.');try{await navigator.clipboard.writeText(area.value);}catch{area.focus();area.select();if(!document.execCommand('copy'))return status('Copy failed. Select and copy the text manually.');}status('Announcement copied.');};
     } else if (name === 'draw') {
       m.innerHTML = r ? `<h3>Draw winners</h3><p>${tickets(r)} tickets available. Each slice represents one eligible ticket; the pointer lands on the selected ticket.</p>${!r.finalSync||r.coverageWarning?'<p>Close entries and complete the final sync before drawing.</p>':''}<div class="row"><label>Winners <input id="ri-count" type="number" min="1" value="1" style="width:70px"></label><label><input id="ri-unique" type="checkbox" checked> Different players</label><button id="ri-spin" ${!r.finalSync||r.coverageWarning?'disabled':''}>Spin and record</button></div><div style="text-align:center;color:#f1be52;font-size:28px">▼</div><div class="wheel" id="ri-wheel"><span>RaffleIQ</span></div><div id="ri-results"></div>` : '<p>No active raffle.</p>';
       if(r)m.querySelector('#ri-spin').onclick=()=>spin(r,m);
@@ -154,12 +177,12 @@
     const button=panel.querySelector('#ri-sync');if(button)button.disabled=true;
     try {
       if(!Object.keys(catalog).length)await loadCatalog(key);
-      const to=r.closedAt||Math.floor(Date.now()/1000),from=Math.min(to,Math.max(Math.floor(r.created/1000),r.lastSync&&!r.issues?.length? r.lastSync-2:0));
+      const to=endTime(r),from=Math.min(to,Math.max(startTime(r),r.lastSync&&!r.issues?.length? r.lastSync-2:0));
       const rows=await allLogs(key,from,to);
       const seen=new Set(r.receipts.map(x=>x.id));let added=0;
       const issues=[];
       for(const [logId,entry] of rows){
-        if(number(entry.log)!==4103||number(entry.timestamp)<Math.floor(r.created/1000)||code(entry.data?.message)!==r.code)continue;
+        if(number(entry.log)!==4103||number(entry.timestamp)<startTime(r)||number(entry.timestamp)>to||code(entry.data?.message)!==r.code)continue;
         const sender=String(entry.data?.sender||'');
         if(!/^\d+$/.test(sender)||sender==='0'){issues.push(`${logId}: missing sender`);continue;}
         for(const [id,rawQty] of receivedItems(entry.data?.items)){
@@ -175,7 +198,7 @@
           seen.add(receiptId);added++;
         }
       }
-      r.issues=issues;r.coverageWarning=issues.length>0;r.lastSync=to;r.finalSync=!!r.closedAt&&!issues.length;
+      r.issues=issues;r.coverageWarning=issues.length>0;r.lastSync=to;r.finalSync=!!(r.closedAt||r.endAt&&Date.now()/1000>=r.endAt)&&!issues.length;
       await loadNames(key,[...new Set(r.receipts.map(x=>x.sender))]);
       save();render();status(`${added} approved transfer(s) recorded. ${issues.length?issues.length+' transfer item(s) need review before drawing.':'All matching transfers processed.'}`);
     }catch(err){r.coverageWarning=true;save();status('Sync incomplete; drawing blocked: '+err.message);}
