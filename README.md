@@ -4,7 +4,7 @@ A standalone TornPDA userscript for occasional faction raffles. No spreadsheet, 
 
 ## Setup
 
-Install `RaffleIQ.user.js` in TornPDA, then open Torn and tap the R button. Create a raffle with a message code such as `R1`. In Settings, press **Create RaffleIQ API key in Torn** to open Torn's prefilled key form, then copy the key back into RaffleIQ. The form requests user log, user basic, and Torn items. Configure approved items, quantities per ticket, and per-player quantity caps before the first transfer.
+Install `RaffleIQ.user.js` in TornPDA, then open Torn and tap the R button. Create a raffle with a message code such as `R1`. In Settings, press **Create RaffleIQ API key in Torn** to open Torn's prefilled key form, then copy the key back into RaffleIQ. The form requests user log, user basic, and Torn items. Configure approved items, quantities per ticket, and per-player quantity caps before the first transfer. Type three letters in an item-name field to see matching Torn items.
 
 The six example bundles are Flash Grenade 200, HEG 330, Smoke Grenade 61, Empty Blood Bag 308, Xanax 6 (10 credited per player), and Firewalk Virus 1 (2 credited per player). Adjust them for each raffle. The Firewalk bundle is below $5m at the market value originally supplied, so review that value and rule before using it.
 
