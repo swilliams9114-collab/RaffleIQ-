@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Added item-name suggestions after typing three letters in Settings.
+
 ## 0.2.2
 
 - Added a button that opens Torn's prefilled RaffleIQ custom API key form. Key creation remains in Torn.
