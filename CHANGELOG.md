@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Added a button that opens Torn's prefilled RaffleIQ custom API key form. Key creation remains in Torn.
+
 ## 0.2.1
 
 - Fixed the empty panel appearing over Torn before the R button is opened.
