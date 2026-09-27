@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1
+
+- Fixed the empty panel appearing over Torn before the R button is opened.
+
 ## 0.2.0
 
 - Added multi-page incoming log scanning, automatic sync while Torn is visible, player name lookup and editable display names.
