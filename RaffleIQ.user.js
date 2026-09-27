@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.2.3
+// @version      0.2.4
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -43,7 +43,7 @@
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.3</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.2.4</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -93,6 +93,16 @@
   function parseLogs(data) {
     const logs=data.log||data.logs||{};
     return Array.isArray(logs)?logs.map(x=>[String(x.id||x.log_id||''),x]):Object.entries(logs);
+  }
+  function receivedItems(items) {
+    if(Array.isArray(items))return items.map((detail,index)=>{
+      const id=detail?.id??detail?.item_id??detail?.item?.id??detail?.item;
+      const qty=detail?.quantity??detail?.qty??detail?.amount??detail?.count;
+      return [String(id??'unknown-'+index),qty];
+    });
+    return Object.entries(items||{}).map(([id,detail])=>[
+      id,Array.isArray(detail)?detail[0]:detail?.quantity??detail?.qty??detail?.amount??detail?.count??detail
+    ]);
   }
   async function api(url) {
     const response=await fetch(url);if(!response.ok)throw Error('API HTTP '+response.status);
@@ -144,7 +154,7 @@
     const button=panel.querySelector('#ri-sync');if(button)button.disabled=true;
     try {
       if(!Object.keys(catalog).length)await loadCatalog(key);
-      const to=r.closedAt||Math.floor(Date.now()/1000),from=Math.min(to,Math.max(Math.floor(r.created/1000),r.lastSync? r.lastSync-2:0));
+      const to=r.closedAt||Math.floor(Date.now()/1000),from=Math.min(to,Math.max(Math.floor(r.created/1000),r.lastSync&&!r.issues?.length? r.lastSync-2:0));
       const rows=await allLogs(key,from,to);
       const seen=new Set(r.receipts.map(x=>x.id));let added=0;
       const issues=[];
@@ -152,10 +162,9 @@
         if(number(entry.log)!==4103||number(entry.timestamp)<Math.floor(r.created/1000)||code(entry.data?.message)!==r.code)continue;
         const sender=String(entry.data?.sender||'');
         if(!/^\d+$/.test(sender)||sender==='0'){issues.push(`${logId}: missing sender`);continue;}
-        const itemMap=entry.data?.items||{};
-        for(const [id,detail] of Object.entries(itemMap)){
+        for(const [id,rawQty] of receivedItems(entry.data?.items)){
           const receiptId=logId+':'+id;if(seen.has(receiptId))continue;
-          const qty=number(Array.isArray(detail)?detail[0]:detail?.quantity??detail);
+          const qty=number(rawQty);
           if(!qty){issues.push(`${receiptId}: invalid quantity`);continue;}
           const item=catalog[String(id)],rule=r.items.find(i=>itemName(i.name)===itemName(item));
           if(!rule){if(!item)issues.push(`${receiptId}: unknown item ${id}`);continue;}
