@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Fixed incoming item receipts returned as a list of item objects. Recheck the full raffle period after a receipt parsing error, so the same transfer can be imported on the next sync.
+
 ## 0.2.3
 
 - Added item-name suggestions after typing three letters in Settings.
