@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Keep the winner's name upright after the wheel stops and show when final sync is complete on the Dashboard.
+
 ## 0.3.0
 
 - Added an editable raffle announcement with prize, item bundles, quantities, tickets, raffle code, and start/end times in TCT. Copying the message does not post to Torn.
