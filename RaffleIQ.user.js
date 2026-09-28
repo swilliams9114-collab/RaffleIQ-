@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.4.0
+// @version      0.4.1
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -56,7 +56,7 @@
   }
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.4.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.4.1</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -66,8 +66,8 @@
     const r = active(), m = panel.querySelector('#ri-main');
     if (name === 'dashboard') {
       const prizeMV=r&&prizeTotal(r),receivedMV=r&&receiptTotal(r),unknown=r&&missingValues(r);
-      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.finalSync&&!r.coverageWarning?'Entries closed; final sync complete. Draw is ready.':r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><h3>Market value</h3><p>Received: ${money(receivedMV)}${unknown?` (${unknown} transfer value(s) unavailable)`:''}<br>Prize items: ${prizeMV?money(prizeMV):'Set prize items in Announcement'}</p>${prizeMV&&!unknown&&receivedMV>=prizeMV?'<p style="padding:10px;background:#764221;border:1px solid #ffcd62;border-radius:6px">⚠️ Received item MV has reached or exceeded the prize MV.</p>':prizeMV&&!unknown?`<p class="muted">${money(prizeMV-receivedMV)} until received item MV reaches prize MV.</p>`:''}<p class="muted">Market values are estimates from Torn’s item catalog, not sale proceeds. Older transfers use the price at the first sync after updating.</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.finalSync?'Recheck receipts':r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
-      if (r) { m.querySelector('#ri-sync').onclick = sync;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
+      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.finalSync&&!r.coverageWarning?'Entries closed; final sync complete. Draw is ready.':r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><h3>Market value</h3><p>Received: ${money(receivedMV)}${unknown?` (${unknown} transfer value(s) unavailable)`:''}<br>Prize items: ${prizeMV?money(prizeMV):'Set prize items in Announcement'}</p>${prizeMV&&!unknown&&receivedMV>=prizeMV?'<p style="padding:10px;background:#764221;border:1px solid #ffcd62;border-radius:6px">⚠️ Received item MV has reached or exceeded the prize MV.</p>':prizeMV&&!unknown?`<p class="muted">${money(prizeMV-receivedMV)} until received item MV reaches prize MV.</p>`:''}<p class="muted">Market values are estimates from Torn’s item catalog, not sale proceeds. ${r.mvRefreshedAt?`Last MV refresh: ${new Date(r.mvRefreshedAt).toLocaleString()}.`:"Use Refresh market values for current estimates."}</p><button id="ri-refresh-mv">Refresh market values</button><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.finalSync?'Recheck receipts':r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
+      if (r) { m.querySelector('#ri-sync').onclick = sync;m.querySelector('#ri-refresh-mv').onclick=refreshMarketValues;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
       m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Approved items</h3><p>Cap is maximum credited quantity per player across this raffle. Zero means unlimited. Partial quantities accumulate within the same item.</p><table><tr><th>Item name</th><th>Per ticket</th><th>Cap</th></tr>${itemRows(r)}</table><button id="ri-items-save">Save items</button>`:''}<h3>Backup</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label>`;
@@ -161,12 +161,31 @@
     }
     return [...results].sort((a,b)=>(a[1].timestamp||0)-(b[1].timestamp||0)||a[0].localeCompare(b[0]));
   }
-  let catalog={},catalogMV={};
+  let catalog={},catalogMV={},refreshingMV=false;
   async function loadCatalog(key) {
     const data=await api(`https://api.torn.com/torn/?selections=items&key=${encodeURIComponent(key)}&comment=RaffleIQ`);
     catalog=Object.fromEntries(Object.entries(data.items||{}).map(([id,v])=>[id,v.name]));
     catalogMV=Object.fromEntries(Object.entries(data.items||{}).map(([id,v])=>[id,Number(v.market_value)]));
     if(!Object.keys(catalog).length)throw Error('Torn item catalog was empty.');
+  }
+  async function refreshMarketValues() {
+    if(refreshingMV)return;
+    const r=active(),key=localStorage.getItem(KEY);
+    if(!r||!key)return status('Create a raffle and save a Torn API key first.');
+    refreshingMV=true;
+    const button=panel.querySelector('#ri-refresh-mv');if(button)button.disabled=true;
+    try {
+      await loadCatalog(key);
+      const byName=new Map(Object.entries(catalog).map(([id,name])=>[itemName(name),id]));
+      const receipts=r.receipts.map(x=>({row:x,id:byName.get(itemName(x.item))}));
+      const prizes=(r.prizeItems||[]).map(x=>({row:x,id:catalog[x.id]?x.id:byName.get(itemName(x.name))}));
+      const all=[...receipts,...prizes];
+      if(all.some(x=>!x.id||!Number.isSafeInteger(catalogMV[x.id])||catalogMV[x.id]<0))return status('Refresh stopped: Torn did not return an MV for every recorded item. Existing values are unchanged.');
+      for(const {row,id} of receipts){row.unitMV=catalogMV[id];row.mvEstimated=true;}
+      for(const {row,id} of prizes){row.unitMV=catalogMV[id];row.id=id;}
+      r.mvRefreshedAt=Date.now();save();render();status('Market values refreshed from Torn. Tickets and draw history are unchanged.');
+    }catch(err){status('Market value refresh failed: '+err.message);}
+    finally{refreshingMV=false;if(button?.isConnected)button.disabled=false;}
   }
   async function loadNames(key,ids) {
     let missing=0;
