@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1
+
+- Summarize item receipts without listing every transfer.
+- Assign prize places to distinct players in recorded draw order; exclude winners from prior spins when Different players is selected.
+
 ## 0.7.0
 
 - Make each raffle announcement state its exact transfer message prominently, save a configurable host name and Torn ID, and explain how incomplete item bundles are treated.
