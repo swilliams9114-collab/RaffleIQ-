@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.1
+
+- Recalculate the first prize ticket estimate immediately when the target MV field changes.
+- Show item rules as compact labeled cards on phone screens so all rule fields remain visible.
+
 ## 0.6.0
 
 - Added target market value per ticket and per-item suggested bundle quantities, with displayed effective MV per ticket.
