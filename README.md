@@ -22,6 +22,8 @@ The six example bundles are Flash Grenade 200, HEG 330, Smoke Grenade 61, Empty 
 
 The importer deduplicates Torn log ID plus item ID, scans additional pages when the API returns its page limit, and refuses to draw if complete coverage cannot be verified. Each receipt's ticket count stays fixed even if the item market value changes. Names and backup data stay on this device. The API key is stored separately and excluded from backup files. If TornPDA is closed, the script cannot monitor until it is opened again.
 
+To clear local test data, open Settings → **Reset all raffle data**, type `RESET`, and confirm. This deletes all raffles, receipts, prizes, and drawing history on the device while preserving the API key. Export a backup first if you may need the results later. Rules already used by a transfer stay locked until you create a new raffle.
+
 ## Torn API and script rules
 
 RaffleIQ makes read-only requests to Torn's official API for the user's own incoming item logs, public item names, and participant display names. It does not request game pages, scrape hidden pages, automate item transfers, send messages, or make gameplay actions. Every drawing is explicitly started by the user. A log scan runs only while Torn is visible, or when the user presses Sync. API rate limits and log schema may change; the importer stops drawing when it cannot verify coverage.
