@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.3.1
+// @version      0.4.0
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -41,6 +41,11 @@
   const drawEntries = r => r.receipts.filter(x => x.entries > 0);
   const tickets = r => drawEntries(r).reduce((n,x) => n+x.entries,0);
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
+  const money = n => '$'+Math.round(n).toLocaleString('en-US');
+  const receiptValue = x => Number.isSafeInteger(x.unitMV)&&x.unitMV>=0 ? x.qty*x.unitMV : null;
+  const receiptTotal = r => r.receipts.reduce((sum,x)=>sum+(receiptValue(x)||0),0);
+  const prizeTotal = r => (r.prizeItems||[]).reduce((sum,x)=>sum+x.qty*x.unitMV,0);
+  const missingValues = r => r.receipts.filter(x=>receiptValue(x)===null).length;
   const localInputTime = seconds => {const d=new Date(seconds*1000);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;};
   const tornTime = seconds => new Date(seconds*1000).toLocaleString('en-GB',{timeZone:'UTC',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})+' TCT';
   const startTime = r => r.startAt || Math.floor(r.created/1000);
@@ -51,7 +56,7 @@
   }
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.3.1</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.4.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -60,7 +65,8 @@
   function tab(name) {
     const r = active(), m = panel.querySelector('#ri-main');
     if (name === 'dashboard') {
-      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.finalSync&&!r.coverageWarning?'Entries closed; final sync complete. Draw is ready.':r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.finalSync?'Recheck receipts':r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
+      const prizeMV=r&&prizeTotal(r),receivedMV=r&&receiptTotal(r),unknown=r&&missingValues(r);
+      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.finalSync&&!r.coverageWarning?'Entries closed; final sync complete. Draw is ready.':r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><h3>Market value</h3><p>Received: ${money(receivedMV)}${unknown?` (${unknown} transfer value(s) unavailable)`:''}<br>Prize items: ${prizeMV?money(prizeMV):'Set prize items in Announcement'}</p>${prizeMV&&!unknown&&receivedMV>=prizeMV?'<p style="padding:10px;background:#764221;border:1px solid #ffcd62;border-radius:6px">⚠️ Received item MV has reached or exceeded the prize MV.</p>':prizeMV&&!unknown?`<p class="muted">${money(prizeMV-receivedMV)} until received item MV reaches prize MV.</p>`:''}<p class="muted">Market values are estimates from Torn’s item catalog, not sale proceeds. Older transfers use the price at the first sync after updating.</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.finalSync?'Recheck receipts':r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
       if (r) { m.querySelector('#ri-sync').onclick = sync;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
@@ -85,7 +91,7 @@
       m.querySelector('#ri-export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'raffleiq-v1',state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='RaffleIQ-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);};
       m.querySelector('#ri-import').onchange=async e=>{try{const raw=JSON.parse(await e.target.files[0].text());if(raw.format!=='raffleiq-v1'||!Array.isArray(raw.state?.raffles))throw Error('Unsupported backup');if(!confirm('Replace all local raffle history with this backup?'))return;state=raw.state;save();render();}catch(err){status('Import failed: '+err.message);}};
     } else if (name === 'receipts') {
-      m.innerHTML = r ? `<h3>Contributions</h3><table><tr><th>Time</th><th>Sender</th><th>Item</th><th>Qty</th><th>Tickets</th><th>Note</th></tr>${r.receipts.slice().reverse().map(x=>`<tr><td>${new Date(x.time*1000).toLocaleString()}</td><td>${esc(displayName(x.sender))}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${x.entries}</td><td>${esc(x.note)}</td></tr>`).join('')}</table>` : '<p>No active raffle.</p>';
+      m.innerHTML = r ? `<h3>Contributions</h3><p>Received item MV: ${money(receiptTotal(r))}${missingValues(r)?` · ${missingValues(r)} value(s) unavailable`:''}</p><div style="overflow-x:auto"><table><tr><th>Time</th><th>Sender</th><th>Item</th><th>Qty</th><th>Unit MV</th><th>Total MV</th><th>Tickets</th><th>Note</th></tr>${r.receipts.slice().reverse().map(x=>`<tr><td>${new Date(x.time*1000).toLocaleString()}</td><td>${esc(displayName(x.sender))}</td><td>${esc(x.item)}</td><td>${x.qty}</td><td>${receiptValue(x)===null?'—':money(x.unitMV)}</td><td>${receiptValue(x)===null?'—':money(receiptValue(x))}</td><td>${x.entries}</td><td>${esc(x.note)}</td></tr>`).join('')}</table></div>` : '<p>No active raffle.</p>';
     } else if (name === 'participants') {
       if (!r) return void (m.innerHTML='<p>No active raffle.</p>');
       const ids=[...new Set(r.receipts.map(x=>x.sender))];
@@ -93,7 +99,11 @@
       m.querySelector('#ri-save-names').onclick=()=>{m.querySelectorAll('[data-player]').forEach(input=>{const value=input.value.trim().slice(0,40);if(value)state.names[input.dataset.player]=value;else delete state.names[input.dataset.player];});save();status('Names saved.');};
     } else if (name === 'announcement') {
       if(!r)return void (m.innerHTML='<p>Create a raffle first.</p>');
-      m.innerHTML=`<h3>Raffle announcement</h3><p class="muted">Enter dates in your device's local time. The draft displays Torn City Time (TCT). Save details before copying.</p><div class="row"><label>Prize <input id="ri-prize" value="${esc(r.prize||'')}" placeholder="What can the winner win?"></label><label>Starts <input id="ri-start" type="datetime-local" value="${localInputTime(startTime(r))}" ${r.receipts.length||r.closedAt?'disabled':''}></label><label>Ends <input id="ri-end" type="datetime-local" value="${r.endAt?localInputTime(r.endAt):''}" ${r.closedAt?'disabled':''}></label></div><p class="muted">${r.receipts.length?'The start is locked because transfers have already been recorded.':''}</p><button id="ri-save-details">Save details</button><h3>Edit your announcement</h3><textarea id="ri-announcement"></textarea><div class="row"><button id="ri-regenerate">Regenerate draft</button><button id="ri-copy">Copy announcement</button></div><p class="muted">Regenerating replaces your edits. Copying does not post anything to Torn.</p>`;
+      m.innerHTML=`<h3>Raffle announcement</h3><p class="muted">Enter dates in your device's local time. The draft displays Torn City Time (TCT). Save details before copying.</p><div class="row"><label>Prize description <input id="ri-prize" value="${esc(r.prize||'')}" placeholder="What can the winner win?"></label><label>Starts <input id="ri-start" type="datetime-local" value="${localInputTime(startTime(r))}" ${r.receipts.length||r.closedAt?'disabled':''}></label><label>Ends <input id="ri-end" type="datetime-local" value="${r.endAt?localInputTime(r.endAt):''}" ${r.closedAt?'disabled':''}></label></div><p class="muted">${r.receipts.length?'The start is locked because transfers have already been recorded.':''}</p><button id="ri-save-details">Save details</button><h3>Prize items for MV comparison</h3><p class="muted">Type the exact Torn item name and quantity, then add each prize item. Values come from Torn's item catalog. This list only affects the MV comparison; the prize description above remains editable.</p><div id="ri-prize-items"></div><div class="row"><label>Item <input id="ri-prize-item" list="ri-item-list" placeholder="e.g. Xanax"></label><datalist id="ri-item-list"></datalist><label>Quantity <input id="ri-prize-qty" type="number" min="1" step="1" value="1" style="width:80px"></label><button id="ri-add-prize">Add prize item</button></div><h3>Edit your announcement</h3><textarea id="ri-announcement"></textarea><div class="row"><button id="ri-regenerate">Regenerate draft</button><button id="ri-copy">Copy announcement</button></div><p class="muted">Regenerating replaces your edits. Copying does not post anything to Torn.</p>`;
+      const showPrizes=()=>{m.querySelector('#ri-prize-items').innerHTML=(r.prizeItems||[]).map((x,i)=>`<div class="row"><span>${esc(x.name)} × ${x.qty} = ${money(x.qty*x.unitMV)} (unit MV ${money(x.unitMV)})</span><button data-remove-prize="${i}">Remove</button></div>`).join('')||'<p>No prize items added.</p>';m.querySelectorAll('[data-remove-prize]').forEach(b=>b.onclick=()=>{r.prizeItems.splice(+b.dataset.removePrize,1);save();showPrizes();});};showPrizes();
+      const fillPrizeSuggestions=()=>{m.querySelector('#ri-item-list').innerHTML=Object.values(catalog).map(x=>`<option value="${esc(x)}"></option>`).join('');};
+      if(Object.keys(catalog).length)fillPrizeSuggestions();else{const key=localStorage.getItem(KEY);if(key)loadCatalog(key).then(fillPrizeSuggestions).catch(err=>status('Prize item values unavailable: '+err.message));}
+      m.querySelector('#ri-add-prize').onclick=()=>{const name=m.querySelector('#ri-prize-item').value.trim(),qty=Number(m.querySelector('#ri-prize-qty').value),match=Object.entries(catalog).find(([,v])=>itemName(v)===itemName(name));if(!match||!Number.isSafeInteger(qty)||qty<1)return status('Choose an exact Torn item name and a positive whole quantity.');const value=catalogMV[match[0]];if(!Number.isSafeInteger(value)||value<0)return status('Torn did not provide a market value for that item.');r.prizeItems||=[];r.prizeItems.push({id:match[0],name:match[1],qty,unitMV:value});save();showPrizes();m.querySelector('#ri-prize-item').value='';status('Prize item added.');};
       const area=m.querySelector('#ri-announcement');area.value=r.announcementEdited?r.announcementText||'':announcement(r);
       area.oninput=()=>{r.announcementText=area.value;r.announcementEdited=true;save();};
       m.querySelector('#ri-save-details').onclick=()=>{
@@ -151,10 +161,11 @@
     }
     return [...results].sort((a,b)=>(a[1].timestamp||0)-(b[1].timestamp||0)||a[0].localeCompare(b[0]));
   }
-  let catalog={};
+  let catalog={},catalogMV={};
   async function loadCatalog(key) {
     const data=await api(`https://api.torn.com/torn/?selections=items&key=${encodeURIComponent(key)}&comment=RaffleIQ`);
     catalog=Object.fromEntries(Object.entries(data.items||{}).map(([id,v])=>[id,v.name]));
+    catalogMV=Object.fromEntries(Object.entries(data.items||{}).map(([id,v])=>[id,Number(v.market_value)]));
     if(!Object.keys(catalog).length)throw Error('Torn item catalog was empty.');
   }
   async function loadNames(key,ids) {
@@ -177,6 +188,7 @@
     const button=panel.querySelector('#ri-sync');if(button)button.disabled=true;
     try {
       if(!Object.keys(catalog).length)await loadCatalog(key);
+      for(const old of r.receipts){if(receiptValue(old)!==null)continue;const found=Object.entries(catalog).find(([,name])=>itemName(name)===itemName(old.item));const value=found&&catalogMV[found[0]];if(Number.isSafeInteger(value)&&value>=0){old.unitMV=value;old.mvEstimated=true;}}
       const to=endTime(r),from=Math.min(to,Math.max(startTime(r),r.lastSync&&!r.issues?.length? r.lastSync-2:0));
       const rows=await allLogs(key,from,to);
       const seen=new Set(r.receipts.map(x=>x.id));let added=0;
@@ -194,7 +206,8 @@
           const used=r.receipts.filter(x=>x.sender===sender&&itemName(x.item)===itemName(rule.name)).reduce((n,x)=>n+x.credited,0);
           const credited=rule.cap?Math.min(qty,Math.max(0,rule.cap-used)):qty;
           const previous=Math.floor(used/rule.bundle),next=Math.floor((used+credited)/rule.bundle);
-          r.receipts.push({id:receiptId,time:number(entry.timestamp),sender,item:rule.name,qty,credited,entries:next-previous,note:credited<qty?'Limit reached':(next===previous?'Partial quantity carried forward':'Accepted')});
+          const unitMV=catalogMV[String(id)];
+          r.receipts.push({id:receiptId,time:number(entry.timestamp),sender,item:rule.name,qty,credited,entries:next-previous,unitMV:Number.isSafeInteger(unitMV)&&unitMV>=0?unitMV:null,note:credited<qty?'Limit reached':(next===previous?'Partial quantity carried forward':'Accepted')});
           seen.add(receiptId);added++;
         }
       }
