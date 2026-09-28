@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.3.0
+// @version      0.3.1
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -51,7 +51,7 @@
   }
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.3.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.3.1</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -60,7 +60,7 @@
   function tab(name) {
     const r = active(), m = panel.querySelector('#ri-main');
     if (name === 'dashboard') {
-      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
+      m.innerHTML = r ? `<h3>${esc(r.name)} · ${esc(r.code)}</h3><p>${tickets(r)} tickets · ${new Set(drawEntries(r).map(x=>x.sender)).size} participants · ${r.receipts.length} transfers recorded</p><p>${r.finalSync&&!r.coverageWarning?'Entries closed; final sync complete. Draw is ready.':r.closedAt?'Entries closed; run final sync before drawing.':r.endAt&&Date.now()/1000>=r.endAt?'Scheduled end reached; run final sync before drawing.':Date.now()/1000<startTime(r)?'Entries have not started yet.':'Entries open.'}</p><p class="muted">Automatic API sync runs every five minutes while Torn is visible. It stops when TornPDA is closed.</p>${r.issues?.length?`<p>Receipt review: ${r.issues.map(esc).join('; ')}</p>`:''}<div class="row"><button id="ri-sync">${r.finalSync?'Recheck receipts':r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'Final sync':'Sync incoming transfers'}</button>${r.closedAt||r.endAt&&Date.now()/1000>=r.endAt?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive">Archive raffle</button></div>` : `<h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div>`;
       if (r) { m.querySelector('#ri-sync').onclick = sync;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
@@ -217,7 +217,7 @@
       for(const x of pool){if(pick<x.entries){row=x;offset=pick;break;}pick-=x.entries;}
       const ordered=drawEntries(r);let start=1;for(const x of ordered){if(x.id===row.id)break;start+=x.entries;}
       const winner={sender:row.sender,ticket:start+offset,receiptId:row.id};winners.push(winner);
-      const wheel=m.querySelector('#ri-wheel');wheel.style.transition='none';wheel.style.transform='rotate(0deg)';wheel.style.background=wheelGradient(pool);wheel.querySelector('span').textContent='Spinning…';void wheel.offsetWidth;wheel.style.transition='transform 3s cubic-bezier(.12,.82,.17,1)';wheel.style.transform=`rotate(${1800-((chosen+.5)/total*360)}deg)`;await new Promise(resolve=>setTimeout(resolve,3100));wheel.querySelector('span').textContent=`${displayName(winner.sender)} · #${winner.ticket}`;
+      const wheel=m.querySelector('#ri-wheel'),label=wheel.querySelector('span');wheel.style.transition='none';wheel.style.transform='rotate(0deg)';wheel.style.background=wheelGradient(pool);label.style.transform='';label.textContent='Spinning…';void wheel.offsetWidth;const angle=1800-((chosen+.5)/total*360);wheel.style.transition='transform 3s cubic-bezier(.12,.82,.17,1)';wheel.style.transform=`rotate(${angle}deg)`;await new Promise(resolve=>setTimeout(resolve,3100));label.style.transform=`rotate(${-angle}deg)`;label.textContent=`${displayName(winner.sender)} · #${winner.ticket}`;
       if(unique)pool=pool.filter(x=>x.sender!==row.sender);else{row.entries--;pool=pool.filter(x=>x.entries>0);}
       m.querySelector('#ri-results').insertAdjacentHTML('beforeend',`<p>Winner ${i+1}: ${esc(displayName(winner.sender))}, ticket #${winner.ticket}</p>`);
     }
