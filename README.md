@@ -11,6 +11,7 @@ The six example bundles are Flash Grenade 200, HEG 330, Smoke Grenade 61, Empty 
 ## Raffle flow
 
 1. Open **Announcement** to enter the prize and start/end dates in your device's local time. The announcement displays Torn City Time (TCT). Edit the generated text as you like, then copy it to post yourself. Regenerate draft when you want to replace edits with the latest raffle details. The start time locks after a transfer is recorded.
+   Add each prize item and quantity under **Prize items for MV comparison**. The Dashboard shows the total market value of received items and prize items, with a warning once received MV reaches the prize MV. Contributions lists per-item and transfer market values. These are catalog estimates, not realized sale proceeds. Receipts from before this feature are valued using the catalog price when next synced.
 2. Give entrants the exact code. Case and outside spaces are ignored; additional words do not match. Only transfers inside the saved start/end window qualify.
 3. The script reads incoming item receipts from Torn's API every five minutes while the Torn page is visible. Use **Sync incoming transfers** to refresh on demand.
 4. Approved quantities accumulate by sender ID and item type. Different item types never combine. One qualifying bundle earns one ticket. Partial quantities carry toward that item's next bundle; caps limit credit across separate transfers.
