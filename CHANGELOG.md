@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+- Added target market value per ticket and per-item suggested bundle quantities, with displayed effective MV per ticket.
+- Each item bundle can award more than one ticket, while the per-player cap still limits the number of credited items. Rules remain editable only before the first transfer.
+
 ## 0.5.0
 
 - Added first, second, and third place prize item lists. Dashboard shows all prizes; combined MV is used for the warning.
