@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Show Torn catalog market value for each incoming transfer and a received total.
+- Add prize items and quantities to Announcement; warn on the Dashboard once received item MV reaches prize item MV. Older receipts get a current-value estimate on the next sync.
+
 ## 0.3.1
 
 - Keep the winner's name upright after the wheel stops and show when final sync is complete on the Dashboard.
