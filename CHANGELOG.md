@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.5.0
+
+- Added first, second, and third place prize item lists. Dashboard shows all prizes; combined MV is used for the warning.
+- Replaced the prize picker with short matching suggestions, and made the generated announcement include saved prize items. Prize and draft edits can be saved on existing raffles without changing a completed final sync.
+
 ## 0.4.1
 
 - Added Refresh market values on the Dashboard. Fetches fresh Torn catalog prices for recorded transfers and prize items without changing tickets or drawings.
