@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.5.0
+// @version      0.6.0
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -37,7 +37,7 @@
   </style><button id="ri-open" title="RaffleIQ">R</button><section id="ri-panel" hidden></section>`;
   const host = document.createElement('div'); host.innerHTML = html; document.body.append(host);
   const panel = host.querySelector('#ri-panel');
-  const itemRows = r => r.items.map((i,n) => `<tr><td><input data-item="${n}" data-field="name" autocomplete="off" value="${esc(i.name)}"><div class="ri-suggest"></div></td><td><input data-item="${n}" data-field="bundle" type="number" min="1" value="${i.bundle}" style="width:85px"></td><td><input data-item="${n}" data-field="cap" type="number" min="0" value="${i.cap}" style="width:85px"></td></tr>`).join('');
+  const itemRows = r => r.items.map((i,n) => `<tr><td><input data-item="${n}" data-field="name" autocomplete="off" value="${esc(i.name)}"><div class="ri-suggest"></div></td><td><input data-item="${n}" data-field="bundle" type="number" min="1" value="${i.bundle}" style="width:75px"></td><td><input data-item="${n}" data-field="tickets" type="number" min="1" value="${i.tickets||1}" style="width:70px"></td><td><input data-item="${n}" data-field="cap" type="number" min="0" value="${i.cap}" style="width:70px"></td><td class="ri-value"></td></tr>`).join('');
   const drawEntries = r => r.receipts.filter(x => x.entries > 0);
   const tickets = r => drawEntries(r).reduce((n,x) => n+x.entries,0);
   const displayName = id => `${state.names[id] || 'Player'} [${id}]`;
@@ -52,13 +52,13 @@
   const startTime = r => r.startAt || Math.floor(r.created/1000);
   const endTime = r => Math.min(r.closedAt||Infinity,r.endAt||Infinity,Math.floor(Date.now()/1000));
   function announcement(r){
-    const lines=r.items.map(i=>`• ${i.name}: ${i.bundle} = 1 ticket${i.cap?` (maximum ${i.cap} credited per player)`:''}`);
+    const lines=r.items.map(i=>`• ${i.name}: ${i.bundle} = ${i.tickets||1} ticket${(i.tickets||1)===1?'':'s'}${i.cap?` (maximum ${i.cap} items credited per player)`:''}`);
     const prizes=[1,2,3].map((place)=>prizeLine(r,place)).map((line,i)=>line?`${['🥇 First','🥈 Second','🥉 Third'][i]}: ${line}`:'').filter(Boolean).join('\n');
     return `🎟️ It's raffle time: ${r.name}!\n\n🏆 Prizes:\n${prizes||r.prize||'[add your prizes]'}${prizes&&r.prize?`\n${r.prize}`:''}\n🕒 Starts: ${tornTime(startTime(r))}\n⏰ Ends: ${r.endAt?tornTime(r.endAt):'[set an end date and time]'}\n\nSend these item bundles to the raffle host:\n${lines.join('\n')}\n\n📨 Put exactly ${r.code} in the transfer message. That's your entry code! Different item types cannot be combined, but partial quantities of the same item carry forward. Every complete bundle earns one ticket. Stack those chances and let the raffle magic begin! 🍀`;
   }
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.5.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.6.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -72,13 +72,30 @@
       if (r) { m.querySelector('#ri-sync').onclick = sync;m.querySelector('#ri-refresh-mv').onclick=refreshMarketValues;const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
-      m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Approved items</h3><p>Cap is maximum credited quantity per player across this raffle. Zero means unlimited. Partial quantities accumulate within the same item.</p><table><tr><th>Item name</th><th>Per ticket</th><th>Cap</th></tr>${itemRows(r)}</table><button id="ri-items-save">Save items</button>`:''}<h3>Backup</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label>`;
+      m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Ticket value and approved items</h3><p>Set a target MV per ticket. Suggestions round item quantities up so each standard ticket meets that target. You may override any bundle and tickets earned. Cap is maximum credited item quantity per player; zero means unlimited. Partial quantities carry forward.</p><label>Target MV per ticket ($) <input id="ri-target-mv" type="number" min="1" step="1" value="${r.targetTicketMV||5000000}"></label>${(r.prizeItems||[]).some(x=>(x.place||1)===1)?`<p class="muted">First place prize MV: ${money((r.prizeItems||[]).filter(x=>(x.place||1)===1).reduce((n,x)=>n+x.qty*x.unitMV,0))}. At the saved target, approximately ${Math.ceil((r.prizeItems||[]).filter(x=>(x.place||1)===1).reduce((n,x)=>n+x.qty*x.unitMV,0)/(r.targetTicketMV||5000000))} standard tickets match that MV. This is a reference, not a guaranteed return.</p>`:""}<div style="overflow-x:auto"><table id="ri-rule-table"><tr><th>Item name</th><th>Items / bundle</th><th>Tickets / bundle</th><th>Item cap / player</th><th>MV comparison</th></tr>${itemRows(r)}</table></div><button id="ri-items-save">Save target and rules</button><p class="muted">Rule changes are locked after the first transfer. MV suggestions change only when you tap Apply suggestion.</p>`:''}<h3>Backup</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label>`;
       m.querySelector('#ri-create-key').onclick=()=>{window.location.href=KEY_BUILDER;};
       m.querySelector('#ri-set-key').onclick=()=>{const k=m.querySelector('#ri-key').value.trim();if(k){localStorage.setItem(KEY,k);m.querySelector('#ri-key').value='';status('Key saved locally.');}};
       m.querySelector('#ri-clear-key').onclick=()=>{localStorage.removeItem(KEY);status('Key removed.');};
       if(r) {
         const key=localStorage.getItem(KEY);
-        if(key&&!Object.keys(catalog).length)loadCatalog(key).catch(err=>status('Item suggestions unavailable: '+err.message));
+        const targetInput=m.querySelector('#ri-target-mv');
+        const updateRuleValues=()=>{
+          const target=Number(targetInput.value);
+          m.querySelectorAll('#ri-rule-table tr').forEach((tr,index)=>{
+            if(!index)return;
+            const name=tr.querySelector('[data-field=name]').value.trim(),bundle=Number(tr.querySelector('[data-field=bundle]').value),award=Number(tr.querySelector('[data-field=tickets]').value),cell=tr.querySelector('.ri-value');
+            const id=Object.keys(catalog).find(id=>itemName(catalog[id])===itemName(name)),mv=id&&catalogMV[id];
+            if(!Number.isSafeInteger(mv)||mv<=0){cell.textContent='MV unavailable';return;}
+            const effective=Number.isSafeInteger(bundle)&&bundle>0&&Number.isSafeInteger(award)&&award>0?bundle*mv/award:0;
+            const suggested=Number.isSafeInteger(target)&&target>0?Math.ceil(target/mv):0;
+            cell.replaceChildren();const summary=document.createElement('span');summary.textContent=`${money(mv)} each · ${effective?money(effective)+'/ticket':'enter a valid rule'}${effective&&target?` (${effective<target?'below':'at/above'} target)`:''}. `;cell.append(summary);
+            if(suggested&&Number.isSafeInteger(suggested)){const button=document.createElement('button');button.type='button';button.textContent=`Apply suggestion: ${suggested} for 1 ticket`;button.onclick=()=>{if(r.receipts.length)return status('Rules are locked after the first transfer.');tr.querySelector('[data-field=bundle]').value=suggested;tr.querySelector('[data-field=tickets]').value=1;updateRuleValues();};cell.append(button);}
+          });
+        };
+        targetInput.oninput=updateRuleValues;
+        if(key&&!Object.keys(catalog).length)loadCatalog(key).then(()=>{if(targetInput.isConnected)updateRuleValues();}).catch(err=>status('Item suggestions unavailable: '+err.message));
+        m.querySelectorAll('#ri-rule-table input').forEach(input=>input.addEventListener('input',updateRuleValues));
+        updateRuleValues();
         m.querySelectorAll('[data-field=name]').forEach(input=>input.addEventListener('input',()=>{
           const box=input.nextElementSibling,query=itemName(input.value);
           box.replaceChildren();
@@ -89,7 +106,7 @@
           });
         }));
       }
-      if(r) m.querySelector('#ri-items-save').onclick=()=>{if(r.receipts.length)return status('Rules are locked after the first transfer. Create a new raffle to change them.');const items=[...m.querySelectorAll('tr')].slice(1).map(tr=>({name:tr.querySelector('[data-field=name]').value.trim(),bundle:number(tr.querySelector('[data-field=bundle]').value),cap:number(tr.querySelector('[data-field=cap]').value)}));if(items.some(i=>!i.name||!i.bundle)||new Set(items.map(i=>itemName(i.name))).size!==items.length)return status('Item names must be unique and bundle sizes positive.');r.items=items;save();status('Items saved.');};
+      if(r) m.querySelector('#ri-items-save').onclick=()=>{if(r.receipts.length)return status('Rules are locked after the first transfer. Create a new raffle to change them.');const target=Number(m.querySelector('#ri-target-mv').value),items=[...m.querySelectorAll('#ri-rule-table tr')].slice(1).map(tr=>({name:tr.querySelector('[data-field=name]').value.trim(),bundle:Number(tr.querySelector('[data-field=bundle]').value),tickets:Number(tr.querySelector('[data-field=tickets]').value),cap:Number(tr.querySelector('[data-field=cap]').value)}));if(!Number.isSafeInteger(target)||target<1||!Number.isSafeInteger(items.reduce((n,x)=>n+x.bundle*x.tickets,0))||items.some(i=>!i.name||!Number.isSafeInteger(i.bundle)||i.bundle<1||!Number.isSafeInteger(i.tickets)||i.tickets<1||!Number.isSafeInteger(i.cap)||i.cap<0||i.cap>0&&i.cap<i.bundle)||new Set(items.map(i=>itemName(i.name))).size!==items.length)return status('Use a positive target, unique items, positive whole bundles/tickets, and caps of zero or at least one full bundle.');r.targetTicketMV=target;r.items=items;save();status('Target and item rules saved. The announcement draft reflects these rules when regenerated.');};
       m.querySelector('#ri-export').onclick=()=>{const blob=new Blob([JSON.stringify({format:'raffleiq-v1',state},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='RaffleIQ-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);};
       m.querySelector('#ri-import').onchange=async e=>{try{const raw=JSON.parse(await e.target.files[0].text());if(raw.format!=='raffleiq-v1'||!Array.isArray(raw.state?.raffles))throw Error('Unsupported backup');if(!confirm('Replace all local raffle history with this backup?'))return;state=raw.state;save();render();}catch(err){status('Import failed: '+err.message);}};
     } else if (name === 'receipts') {
@@ -230,8 +247,9 @@
           const used=r.receipts.filter(x=>x.sender===sender&&itemName(x.item)===itemName(rule.name)).reduce((n,x)=>n+x.credited,0);
           const credited=rule.cap?Math.min(qty,Math.max(0,rule.cap-used)):qty;
           const previous=Math.floor(used/rule.bundle),next=Math.floor((used+credited)/rule.bundle);
+          const entries=(next-previous)*(rule.tickets||1);
           const unitMV=catalogMV[String(id)];
-          r.receipts.push({id:receiptId,time:number(entry.timestamp),sender,item:rule.name,qty,credited,entries:next-previous,unitMV:Number.isSafeInteger(unitMV)&&unitMV>=0?unitMV:null,note:credited<qty?'Limit reached':(next===previous?'Partial quantity carried forward':'Accepted')});
+          r.receipts.push({id:receiptId,time:number(entry.timestamp),sender,item:rule.name,qty,credited,entries,unitMV:Number.isSafeInteger(unitMV)&&unitMV>=0?unitMV:null,note:credited<qty?'Limit reached':(next===previous?'Partial quantity carried forward':'Accepted')});
           seen.add(receiptId);added++;
         }
       }
