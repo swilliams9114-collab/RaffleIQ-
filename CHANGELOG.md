@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0
+
+- Make each raffle announcement state its exact transfer message prominently, save a configurable host name and Torn ID, and explain how incomplete item bundles are treated.
+- Add a leadership receipt for active or archived raffles with approved coded item totals, current saved MV, recorded winners, assigned and planned prizes, and the difference between received and assigned prize MV. Copy or download the report and refresh MV before sharing.
+
 ## 0.6.2
 
 - Explain the first-transfer rule lock beside suggestions, show inline feedback when a suggestion is applied or rules are saved.
