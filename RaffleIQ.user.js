@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.7.0
+// @version      0.7.1
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -60,7 +60,7 @@
     return `🎟️ It's raffle time: ${r.name}!\n\n🏆 Prizes:\n${prizes||r.prize||'[add your prizes]'}${prizes&&r.prize?`\n${r.prize}`:''}\n🕒 Starts: ${tornTime(startTime(r))}\n⏰ Ends: ${r.endAt?tornTime(r.endAt):'[set an end date and time]'}\n\nSend items directly to ${hostName(r)} [${hostId(r)}].\n\nREQUIRED TRANSFER MESSAGE: ${r.code}\nUse exactly ${r.code} as the item transfer message. This code is specific to this raffle; other messages will not earn tickets.\n\nAccepted item bundles:\n${lines.join('\n')}\n\nDifferent item types cannot be combined. Partial quantities of the same item carry forward until the raffle closes. An incomplete bundle at closing earns no tickets and is considered a donation to the faction. The host is not responsible for incomplete donations; contact ${hostName(r)} before sending if you need to arrange an exception.\n\nGood luck, Aurorians! 🍀`;
   }
   function leadershipReceipt(r) {
-    const winners=(r.draws||[]).flatMap(d=>d.winners.map(w=>({...w,drawTime:d.time}))),prizes=r.prizeItems||[];
+    const recordedWinners=(r.draws||[]).flatMap(d=>d.winners.map(w=>({...w,drawTime:d.time}))),seenWinners=new Set(),winners=recordedWinners.filter(w=>{if(seenWinners.has(w.sender))return false;seenWinners.add(w.sender);return true;}),prizes=r.prizeItems||[];
     const items=new Map();
     for(const x of r.receipts){const old=items.get(x.item)||{qty:0,value:0,prices:new Set(),unknown:0};old.qty+=x.qty;const value=receiptValue(x);if(value===null)old.unknown++;else{old.value+=value;old.prices.add(x.unitMV);}items.set(x.item,old);}
     const awarded=prizes.filter(x=>winners[(x.place||1)-1]),awardedMV=awarded.reduce((n,x)=>n+x.qty*x.unitMV,0),receivedMV=receiptTotal(r),missing=missingValues(r);
@@ -68,10 +68,7 @@
     const lines=[`RAFFLEIQ LEADERSHIP RECEIPT — ${r.finalSync&&!r.coverageWarning?'FINAL SYNC COMPLETE':'PROVISIONAL'}`,`Raffle: ${r.name} | Transfer message: ${r.code}`,`Host: ${hostName(r)} [${hostId(r)}]`,`Generated: ${tornTime(Math.floor(Date.now()/1000))}`,`Entry window: ${tornTime(startTime(r))} to ${tornTime(r.closedAt||r.endAt||Math.floor(Date.now()/1000))}`,`Tickets: ${tickets(r)} | Participants: ${new Set(drawEntries(r).map(x=>x.sender)).size} | Recorded transfers: ${r.receipts.length}`,'',`ITEMS RECEIVED (approved transfers with message ${r.code})`];
     for(const [name,x] of items)lines.push(`${name}: ${x.qty} received | unit MV: ${x.unknown?'unavailable':x.prices.size===1?money([...x.prices][0]):'mixed saved prices; refresh MV'} | total MV: ${money(x.value)}${x.unknown?` (${x.unknown} transfer value(s) unavailable)`:''}`);
     if(!items.size)lines.push('No approved coded transfers recorded.');
-    lines.push(`TOTAL RECEIVED MV: ${missing?'Incomplete — '+money(receivedMV)+' known':money(receivedMV)}`,'', 'RECORDED TRANSFERS');
-    for(const x of r.receipts)lines.push(`${tornTime(x.time)} | ${displayName(x.sender)} | ${x.qty}× ${x.item} | MV ${receiptValue(x)===null?'unavailable':money(receiptValue(x))} | ${x.entries} ticket(s) | ${x.note}`);
-    if(!r.receipts.length)lines.push('None.');
-    lines.push('','PRIZES AND DRAW RESULTS');
+    lines.push(`TOTAL RECEIVED MV: ${missing?'Incomplete — '+money(receivedMV)+' known':money(receivedMV)}`,'','PRIZES AND DRAW RESULTS');
     for(let place=1;place<=3;place++){
       const winner=winners[place-1],label=['First','Second','Third'][place-1],rows=prizes.filter(x=>(x.place||1)===place),mv=rows.reduce((n,x)=>n+x.qty*x.unitMV,0);
       lines.push(`${label}: ${winner?`${displayName(winner.sender)} (ticket #${winner.ticket}; drawn ${tornTime(Math.floor(winner.drawTime/1000))})`:'No winner recorded'} | prize MV ${money(mv)}${winner?' (assigned)':' (planned)'}`);
@@ -79,15 +76,16 @@
       if(!rows.length)lines.push('  No prize items configured.');
     }
     lines.push(`PLANNED PRIZE MV: ${money(prizeTotal(r))}`,`ASSIGNED PRIZE MV: ${money(awardedMV)}`,`DIFFERENCE (received MV minus assigned prize MV): ${difference}`);
-    if(winners.length>3)lines.push(`${winners.length-3} additional recorded winner(s) have no first/second/third place prize assignment.`);
+    if(winners.length>3)lines.push(`${winners.length-3} additional distinct recorded winner(s) have no first/second/third place prize assignment.`);
+    if(recordedWinners.length>winners.length)lines.push(`${recordedWinners.length-winners.length} repeat draw result(s) for an already listed player were excluded from prize placement.`);
     if(r.issues?.length)lines.push(`REVIEW REQUIRED: ${r.issues.join('; ')}`);
-    lines.push('',`Prizes marked assigned follow the order of recorded winners; actual item delivery is not verified by RaffleIQ. Valuations use saved Torn item catalog MV${r.mvRefreshedAt?` refreshed ${tornTime(Math.floor(r.mvRefreshedAt/1000))}`:''}; they are estimates, not sale proceeds. This receipt includes approved incoming items with this raffle's exact message code. Other incoming transfers are outside this report.`);
+    lines.push('',`Prizes marked assigned follow the order of the first distinct recorded winners; actual item delivery is not verified by RaffleIQ. Valuations use saved Torn item catalog MV${r.mvRefreshedAt?` refreshed ${tornTime(Math.floor(r.mvRefreshedAt/1000))}`:''}; they are estimates, not sale proceeds. This receipt includes approved incoming items with this raffle's exact message code. Other incoming transfers are outside this report.`);
     return lines.join('\n');
   }
   let reportSelection=null;
   function render() {
     const r = active();
-    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.7.0</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
+    panel.innerHTML = `<div class="row"><h2 style="margin:0;flex:1">RaffleIQ 0.7.1</h2><button id="ri-close">Close</button></div><div id="ri-status" class="muted"></div>
     <div class="row"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="report">Leadership receipt</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></div><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => tab(b.dataset.tab));
@@ -184,7 +182,7 @@
     } else if (name === 'report') {
       if(!state.raffles.length)return void(m.innerHTML='<p>Create a raffle to generate a leadership receipt.</p>');
       const chosen=state.raffles.find(x=>x.id===reportSelection)||r||state.raffles.at(-1);reportSelection=chosen.id;
-      m.innerHTML=`<h3>Leadership receipt</h3><label>Raffle <select id="ri-report-raffle">${state.raffles.map(x=>`<option value="${esc(x.id)}" ${x.id===chosen.id?'selected':''}>${esc(x.name)} · ${esc(x.code)}</option>`).join('')}</select></label><p class="muted">Refresh market values before sharing for current estimates. The receipt includes approved coded transfers and uses recorded draw order for first, second, and third place.</p><div class="row"><button id="ri-refresh-mv">Refresh MV for this raffle</button><button id="ri-report-copy">Copy receipt</button><button id="ri-report-download">Download receipt</button></div><textarea id="ri-report-text" readonly></textarea>`;
+      m.innerHTML=`<h3>Leadership receipt</h3><label>Raffle <select id="ri-report-raffle">${state.raffles.map(x=>`<option value="${esc(x.id)}" ${x.id===chosen.id?'selected':''}>${esc(x.name)} · ${esc(x.code)}</option>`).join('')}</select></label><p class="muted">Refresh market values before sharing for current estimates. The receipt summarizes approved coded items and assigns first, second, and third place to the first distinct winners in draw order.</p><div class="row"><button id="ri-refresh-mv">Refresh MV for this raffle</button><button id="ri-report-copy">Copy receipt</button><button id="ri-report-download">Download receipt</button></div><textarea id="ri-report-text" readonly></textarea>`;
       const area=m.querySelector('#ri-report-text');area.value=leadershipReceipt(chosen);
       m.querySelector('#ri-report-raffle').onchange=e=>{reportSelection=e.target.value;tab('report');};
       m.querySelector('#ri-refresh-mv').onclick=()=>refreshMarketValues(chosen,'report');
@@ -312,9 +310,9 @@
   function wheelGradient(pool){const total=pool.reduce((n,x)=>n+x.entries,0);let pos=0;const stops=[];for(const row of pool){const start=pos/total*360;pos+=row.entries;const end=pos/total*360;const hue=(Number(row.sender)*73)%360;stops.push(`hsl(${hue} 65% 54%) ${start}deg ${end}deg`);}return `conic-gradient(${stops.join(',')})`;}
   async function spin(r,m){
     const count=number(m.querySelector('#ri-count').value),unique=m.querySelector('#ri-unique').checked;
-    let pool=drawEntries(r).map(x=>({...x}));const players=new Set(pool.map(x=>x.sender));
+    let pool=drawEntries(r).map(x=>({...x}));if(unique){const previouslyDrawn=new Set((r.draws||[]).flatMap(d=>d.winners.map(w=>w.sender)));pool=pool.filter(x=>!previouslyDrawn.has(x.sender));}const players=new Set(pool.map(x=>x.sender));
     if(!r.finalSync||r.coverageWarning)return status('Complete the final sync first.');
-    if(!count||count>100||count>(unique?players.size:tickets(r)))return status('Choose 1–100 winners within the eligible pool.');
+    if(!count||count>100||count>(unique?players.size:tickets(r)))return status(unique?'Choose 1–100 winners from players who have not won this raffle yet.':'Choose 1–100 winners within the eligible pool.');
     const button=m.querySelector('#ri-spin');button.disabled=true;const winners=[];
     for(let i=0;i<count;i++){
       const total=pool.reduce((n,x)=>n+x.entries,0),chosen=randomBelow(total);let pick=chosen,row,offset;
