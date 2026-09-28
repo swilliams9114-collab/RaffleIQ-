@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0
+
+- Replace the tall button grid with a compact, horizontally scrollable section bar and a phone-friendly Torn-style dark dashboard.
+- Bring the raffle code, counts, draw readiness, market values, and controls together in short cards. Keep the current section selected after sync and refresh.
+
 ## 0.7.1
 
 - Summarize item receipts without listing every transfer.
