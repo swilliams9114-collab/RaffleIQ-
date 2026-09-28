@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.2
+
+- Explain the first-transfer rule lock beside suggestions, show inline feedback when a suggestion is applied or rules are saved.
+- Add a local raffle data reset that requires typing RESET and confirming deletion; keeps the saved Torn API key.
+
 ## 0.6.1
 
 - Recalculate the first prize ticket estimate immediately when the target MV field changes.
