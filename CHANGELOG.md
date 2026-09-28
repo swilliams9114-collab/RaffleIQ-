@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Added Refresh market values on the Dashboard. Fetches fresh Torn catalog prices for recorded transfers and prize items without changing tickets or drawings.
+
 ## 0.4.0
 
 - Show Torn catalog market value for each incoming transfer and a received total.
