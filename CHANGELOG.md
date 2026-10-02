@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1
+
+- Show Contributions as readable receipt cards with sender, item, quantity, tickets, and market values on phones.
+- Show Participants as editable cards, fix table text contrast against Torn's page styles, and clear old status messages when changing sections.
+
 ## 0.8.0
 
 - Replace the tall button grid with a compact, horizontally scrollable section bar and a phone-friendly Torn-style dark dashboard.
