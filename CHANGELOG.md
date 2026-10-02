@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+
+- Show the actual eligible ticket pool on the Draw wheel before spinning, including ticket and player counts.
+- Refresh the wheel preview when Different players changes and after a sync. Use distinct colors for players while keeping segment sizes proportional to their tickets.
+
 ## 0.8.1
 
 - Show Contributions as readable receipt cards with sender, item, quantity, tickets, and market values on phones.
