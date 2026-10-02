@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0
+
+- Add a Ticket audit tab that independently checks each player's received and credited item quantities against the saved bundle, tickets-per-bundle, and player cap rules.
+- Show expected versus recorded tickets, credited remainder and quantity short of the next bundle, and items above the cap. Flag mismatches and unverified saved data, with a dashboard warning and per-transfer details.
+
 ## 0.8.2
 
 - Show the actual eligible ticket pool on the Draw wheel before spinning, including ticket and player counts.
