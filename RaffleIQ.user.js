@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.8.1
+// @version      0.8.2
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -89,7 +89,7 @@
   let currentTab = 'dashboard';
   function render() {
     const r = active();
-    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.8.1</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
+    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.8.2</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
     <nav class="ri-tabs" aria-label="RaffleIQ sections"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="report">Leadership receipt</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></nav><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {status('');tab(b.dataset.tab);});
@@ -192,8 +192,8 @@
       m.querySelector('#ri-regenerate').onclick=()=>{area.value=announcement(r);r.announcementText=area.value;r.announcementEdited=false;save();status('Draft regenerated.');};
       m.querySelector('#ri-copy').onclick=async()=>{if(!(r.prize||r.prizeItems?.length)||!r.endAt)return status('Save at least one prize and an end time before copying.');try{await navigator.clipboard.writeText(area.value);}catch{area.focus();area.select();if(!document.execCommand('copy'))return status('Copy failed. Select and copy the text manually.');}status('Announcement copied.');};
     } else if (name === 'draw') {
-      m.innerHTML = r ? `<h3>Draw winners</h3><p>${tickets(r)} tickets available. Each slice represents one eligible ticket; the pointer lands on the selected ticket.</p>${!r.finalSync||r.coverageWarning?'<p>Close entries and complete the final sync before drawing.</p>':''}<div class="row"><label>Winners <input id="ri-count" type="number" min="1" value="1" style="width:70px"></label><label><input id="ri-unique" type="checkbox" checked> Different players</label><button id="ri-spin" ${!r.finalSync||r.coverageWarning?'disabled':''}>Spin and record</button></div><div style="text-align:center;color:#f1be52;font-size:28px">▼</div><div class="wheel" id="ri-wheel"><span>RaffleIQ</span></div><div id="ri-results"></div>` : '<p>No active raffle.</p>';
-      if(r)m.querySelector('#ri-spin').onclick=()=>spin(r,m);
+      m.innerHTML = r ? `<h3>Draw winners</h3><p id="ri-preview" class="muted"></p>${!r.finalSync||r.coverageWarning?'<p>Close entries and complete the final sync before drawing.</p>':''}<div class="row"><label>Winners <input id="ri-count" type="number" min="1" value="1" style="width:70px"></label><label><input id="ri-unique" type="checkbox" checked> Different players</label><button id="ri-spin" ${!r.finalSync||r.coverageWarning?'disabled':''}>Spin and record</button></div><div style="text-align:center;color:#f1be52;font-size:28px">▼</div><div class="wheel" id="ri-wheel"><span>RaffleIQ</span></div><div id="ri-results"></div>` : '<p>No active raffle.</p>';
+      if(r){m.querySelector('#ri-unique').onchange=()=>previewWheel(r,m);m.querySelector('#ri-spin').onclick=()=>spin(r,m);previewWheel(r,m);}
     } else if (name === 'report') {
       if(!state.raffles.length)return void(m.innerHTML='<p>Create a raffle to generate a leadership receipt.</p>');
       const chosen=state.raffles.find(x=>x.id===reportSelection)||r||state.raffles.at(-1);reportSelection=chosen.id;
@@ -322,10 +322,12 @@
     finally {syncing=false;if(button?.isConnected)button.disabled=false;}
   }
   function randomBelow(n){const range=0x100000000;if(!Number.isSafeInteger(n)||n<1||n>range)throw Error('Invalid ticket count');const limit=Math.floor(range/n)*n,buf=new Uint32Array(1);let v;do{crypto.getRandomValues(buf);v=buf[0];}while(v>=limit);return v%n;}
-  function wheelGradient(pool){const total=pool.reduce((n,x)=>n+x.entries,0);let pos=0;const stops=[];for(const row of pool){const start=pos/total*360;pos+=row.entries;const end=pos/total*360;const hue=(Number(row.sender)*73)%360;stops.push(`hsl(${hue} 65% 54%) ${start}deg ${end}deg`);}return `conic-gradient(${stops.join(',')})`;}
+  function eligiblePool(r,unique){const won=new Set(unique?(r.draws||[]).flatMap(d=>d.winners.map(w=>w.sender)):[]);return drawEntries(r).filter(x=>!won.has(x.sender)).map(x=>({...x}));}
+  function wheelGradient(pool){const total=pool.reduce((n,x)=>n+x.entries,0);if(!total)return '#39414b';let pos=0;const stops=[],colors=new Map();for(const row of pool){const start=pos/total*360;pos+=row.entries;const end=pos/total*360;if(!colors.has(row.sender))colors.set(row.sender,(205+colors.size*137)%360);stops.push(`hsl(${colors.get(row.sender)} 65% 54%) ${start}deg ${end}deg`);}return `conic-gradient(${stops.join(',')})`;}
+  function previewWheel(r,m){const pool=eligiblePool(r,m.querySelector('#ri-unique').checked),total=pool.reduce((n,x)=>n+x.entries,0),players=new Set(pool.map(x=>x.sender)).size;const wheel=m.querySelector('#ri-wheel');wheel.style.background=wheelGradient(pool);wheel.querySelector('span').textContent=total?`${total} ticket${total===1?'':'s'} · ${players} player${players===1?'':'s'}`:'No eligible tickets';m.querySelector('#ri-preview').textContent=total?`${total} eligible ticket${total===1?'':'s'} from ${players} player${players===1?'':'s'}. Colored areas show each player's share of the ticket pool; every ticket has an equal chance.`:'No eligible tickets for this draw. If Different players is selected, prior winners are excluded.';m.querySelector('#ri-spin').disabled=!total||!r.finalSync||!!r.coverageWarning;}
   async function spin(r,m){
     const count=number(m.querySelector('#ri-count').value),unique=m.querySelector('#ri-unique').checked;
-    let pool=drawEntries(r).map(x=>({...x}));if(unique){const previouslyDrawn=new Set((r.draws||[]).flatMap(d=>d.winners.map(w=>w.sender)));pool=pool.filter(x=>!previouslyDrawn.has(x.sender));}const players=new Set(pool.map(x=>x.sender));
+    let pool=eligiblePool(r,unique);const players=new Set(pool.map(x=>x.sender));
     if(!r.finalSync||r.coverageWarning)return status('Complete the final sync first.');
     if(!count||count>100||count>(unique?players.size:tickets(r)))return status(unique?'Choose 1–100 winners from players who have not won this raffle yet.':'Choose 1–100 winners within the eligible pool.');
     const button=m.querySelector('#ri-spin');button.disabled=true;const winners=[];
