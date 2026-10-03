@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- Add fourth place to prize selection, the announcement draft, dashboard, and leadership receipt.
+- Assign the fourth distinct recorded winner to fourth place and include that prize in planned and assigned market value totals.
+
 ## 0.9.0
 
 - Add a Ticket audit tab that independently checks each player's received and credited item quantities against the saved bundle, tickets-per-bundle, and player cap rules.
