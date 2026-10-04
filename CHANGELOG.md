@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.2
+
+- Show approximate saved raffle data size, raffle counts, and transfer count in Settings.
+- Allow individually deleting archived raffles from History after a confirmation; remove unused saved player names while keeping active and other archived raffle data.
+
 ## 0.9.1
 
 - Add fourth place to prize selection, the announcement draft, dashboard, and leadership receipt.
