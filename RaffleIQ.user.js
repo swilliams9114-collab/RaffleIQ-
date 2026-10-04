@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.9.1
+// @version      0.9.2
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -24,6 +24,8 @@
   state.names ||= {};
   const save = () => localStorage.setItem(STORE, JSON.stringify(state));
   const active = () => state.raffles.find(r => r.active);
+  const storageSize = () => new Blob([localStorage.getItem(STORE)||JSON.stringify(state)]).size;
+  const storageLabel = bytes => bytes<1024?`${bytes} bytes`:bytes<1048576?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/1048576).toFixed(2)} MB`;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number = x => Number.isSafeInteger(+x) && +x >= 0 ? +x : 0;
   const code = x => String(x || '').trim().toUpperCase();
@@ -117,10 +119,19 @@
     return lines.join('\n');
   }
   let reportSelection=null;
+  function removeArchivedRaffle(id) {
+    const index=state.raffles.findIndex(r=>r.id===id&&!r.active);
+    if(index<0)return false;
+    state.raffles.splice(index,1);
+    const used=new Set(state.raffles.flatMap(r=>[...r.receipts.map(x=>String(x.sender)),...r.draws.flatMap(d=>d.winners.map(w=>String(w.sender)))]));
+    for(const player of Object.keys(state.names))if(!used.has(player))delete state.names[player];
+    if(reportSelection===id)reportSelection=null;
+    save();return true;
+  }
   let currentTab = 'dashboard';
   function render() {
     const r = active();
-    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.9.1</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
+    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.9.2</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
     <nav class="ri-tabs" aria-label="RaffleIQ sections"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="audit">Ticket audit</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="report">Leadership receipt</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></nav><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {status('');tab(b.dataset.tab);});
@@ -147,7 +158,7 @@
       if (r) { m.querySelector('#ri-sync').onclick = sync;m.querySelector('#ri-refresh-mv').onclick=()=>refreshMarketValues();const audit=m.querySelector('#ri-audit-open');if(audit)audit.onclick=()=>tab('audit');const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,hostName:'_samara_',hostId:'3979390',active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
     } else if (name === 'settings') {
-      m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Ticket value and approved items</h3><p>Set a target MV per ticket. Suggestions round item quantities up so each standard ticket meets that target. You may override any bundle and tickets earned. Cap is maximum credited item quantity per player; zero means unlimited. Partial quantities carry forward.</p><label>Target MV per ticket ($) <input id="ri-target-mv" type="number" min="1" step="1" value="${r.targetTicketMV||5000000}"></label>${(r.prizeItems||[]).some(x=>(x.place||1)===1)?'<p id="ri-prize-estimate" class="muted"></p>':""}<div style="overflow-x:auto"><table id="ri-rule-table"><tr><th>Item name</th><th>Items / bundle</th><th>Tickets / bundle</th><th>Item cap / player</th><th>MV comparison</th></tr>${itemRows(r)}</table></div><button id="ri-items-save">Save target and rules</button><p id="ri-rule-save-feedback" class="muted">${r.receipts.length?"This raffle has transfers, so its rules are locked. Reset all raffle data or create a new raffle to set new rules.":"Suggestions change the fields; tap Save target and rules to keep them."}</p>`:''}<h3>Backup and reset</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label><p>Reset removes all local raffles, receipts, prize settings, and draw history on this device. Your saved API key stays in place.</p><button id="ri-reset-open">Reset all raffle data</button><div id="ri-reset-confirm" hidden><p>To confirm deletion, type RESET below, then tap Confirm reset.</p><input id="ri-reset-word" autocomplete="off" placeholder="RESET"><button id="ri-reset-final">Confirm reset</button><button id="ri-reset-cancel">Cancel</button></div>`;
+      m.innerHTML = `<h3>Settings</h3><button id="ri-create-key">Create RaffleIQ API key in Torn</button><p class="muted">Opens Torn's key form with User basic, User log, and Torn items selected. Torn creates the key; return here to paste it. The script never reads your key from Torn settings.</p><label>API key <input id="ri-key" type="password" placeholder="Stored on this device" autocomplete="off"></label><button id="ri-set-key">Save key</button><button id="ri-clear-key">Remove key</button><p class="muted">The key stays on this device and is sent only to api.torn.com.</p>${r?`<h3>Ticket value and approved items</h3><p>Set a target MV per ticket. Suggestions round item quantities up so each standard ticket meets that target. You may override any bundle and tickets earned. Cap is maximum credited item quantity per player; zero means unlimited. Partial quantities carry forward.</p><label>Target MV per ticket ($) <input id="ri-target-mv" type="number" min="1" step="1" value="${r.targetTicketMV||5000000}"></label>${(r.prizeItems||[]).some(x=>(x.place||1)===1)?'<p id="ri-prize-estimate" class="muted"></p>':""}<div style="overflow-x:auto"><table id="ri-rule-table"><tr><th>Item name</th><th>Items / bundle</th><th>Tickets / bundle</th><th>Item cap / player</th><th>MV comparison</th></tr>${itemRows(r)}</table></div><button id="ri-items-save">Save target and rules</button><p id="ri-rule-save-feedback" class="muted">${r.receipts.length?"This raffle has transfers, so its rules are locked. Reset all raffle data or create a new raffle to set new rules.":"Suggestions change the fields; tap Save target and rules to keep them."}</p>`:''}<h3>Storage on this device</h3><p><strong>${storageLabel(storageSize())}</strong> of RaffleIQ raffle data · ${state.raffles.length} raffle(s) (${state.raffles.filter(x=>!x.active).length} archived) · ${state.raffles.reduce((n,x)=>n+x.receipts.length,0)} transfer record(s).</p><p class="muted">Approximate size of saved raffle data only. Downloaded backups and other Torn scripts are separate. Archived raffles keep their details until deleted in History.</p><h3>Backup and reset</h3><button id="ri-export">Export backup</button><label>Import backup <input id="ri-import" type="file" accept="application/json,.json"></label><p>Reset removes all local raffles, receipts, prize settings, and draw history on this device. Your saved API key stays in place.</p><button id="ri-reset-open">Reset all raffle data</button><div id="ri-reset-confirm" hidden><p>To confirm deletion, type RESET below, then tap Confirm reset.</p><input id="ri-reset-word" autocomplete="off" placeholder="RESET"><button id="ri-reset-final">Confirm reset</button><button id="ri-reset-cancel">Cancel</button></div>`;
       m.querySelector('#ri-create-key').onclick=()=>{window.location.href=KEY_BUILDER;};
       m.querySelector('#ri-set-key').onclick=()=>{const k=m.querySelector('#ri-key').value.trim();if(k){localStorage.setItem(KEY,k);m.querySelector('#ri-key').value='';status('Key saved locally.');}};
       m.querySelector('#ri-clear-key').onclick=()=>{localStorage.removeItem(KEY);status('Key removed.');};
@@ -242,7 +253,14 @@
       m.querySelector('#ri-report-copy').onclick=async()=>{try{await navigator.clipboard.writeText(area.value);}catch{area.focus();area.select();if(!document.execCommand('copy'))return status('Copy failed; select and copy the receipt manually.');}status('Leadership receipt copied.');};
       m.querySelector('#ri-report-download').onclick=()=>{const blob=new Blob([area.value],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='RaffleIQ-'+chosen.code.replace(/[^a-z0-9_-]/gi,'')+'-receipt.txt';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),30000);status('Receipt downloaded.');};
     } else if (name === 'history') {
-      m.innerHTML=state.raffles.slice().reverse().map(r=>`<h3>${esc(r.name)} ${r.active?'(active)':'(closed)'}</h3><p>${r.receipts.length} transfers · ${tickets(r)} tickets</p>${r.draws.map(d=>`<p>${new Date(d.time).toLocaleString()}: ${d.winners.map(w=>`${esc(displayName(w.sender))} (#${w.ticket})`).join(', ')}</p>`).join('')}`).join('')||'<p>No raffles yet.</p>';
+      m.innerHTML=`<h3>History</h3><p class="muted">Archived raffles stay on this device until you delete them. Export a backup in Settings before removing a raffle you may need later.</p>${state.raffles.slice().reverse().map(r=>`<section class="ri-card"><h3>${esc(r.name)} · ${esc(r.code)} ${r.active?'(active)':'(archived)'}</h3><p>${r.receipts.length} transfers · ${tickets(r)} tickets</p>${r.draws.map(d=>`<p>${new Date(d.time).toLocaleString()}: ${d.winners.map(w=>`${esc(displayName(w.sender))} (#${w.ticket})`).join(', ')}</p>`).join('')}${r.active?'':`<button data-delete-raffle="${esc(r.id)}">Delete archived raffle</button>`}</section>`).join('')||'<p>No raffles yet.</p>'}`;
+      m.querySelectorAll('[data-delete-raffle]').forEach(button=>button.onclick=()=>{
+        if(syncing||refreshingMV)return status('Wait for the current API request to finish before deleting a raffle.');
+        const target=state.raffles.find(x=>x.id===button.dataset.deleteRaffle&&!x.active);
+        if(!target)return status('Only archived raffles can be deleted.');
+        if(!confirm(`Delete archived raffle ${target.name} (${target.code}) and its ${target.receipts.length} transfer(s) and ${target.draws.length} draw(s) from this device? Export a backup first if you need these records.`))return;
+        if(removeArchivedRaffle(target.id)){render();status('Archived raffle deleted from this device.');}
+      });
     }
   }
   function parseLogs(data) {
