@@ -32,6 +32,8 @@ The importer deduplicates Torn log ID plus item ID, scans additional pages when 
 
 To clear local test data, open Settings → **Reset all raffle data**, type `RESET`, and confirm. This deletes all raffles, receipts, prizes, and drawing history on the device while preserving the API key. Export a backup first if you may need the results later. Rules already used by a transfer stay locked until you create a new raffle.
 
+Settings displays an approximate size for RaffleIQ's saved raffle data and counts its raffles and transfer records. Archived raffles continue to occupy local storage until removed. In History, **Delete archived raffle** removes one archived raffle and its transfers and draws after confirmation, while retaining other raffles and the API key. Export a backup first if you want to preserve its results. Downloaded backups remain in your device's files and are not included in the storage figure.
+
 ## Torn API and script rules
 
 RaffleIQ makes read-only requests to Torn's official API for the user's own incoming item logs, public item names, and participant display names. It does not request game pages, scrape hidden pages, automate item transfers, send messages, or make gameplay actions. Every drawing is explicitly started by the user. A log scan runs only while Torn is visible, or when the user presses Sync. API rate limits and log schema may change; the importer stops drawing when it cannot verify coverage.
