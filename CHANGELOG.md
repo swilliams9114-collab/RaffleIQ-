@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.3
+
+- Add an editable, copyable coming soon promo in Announcement, even before a raffle is created.
+- Fill prize places from the current raffle while leaving items, ticket value, and start date as TBD. Keep promo edits separate from the official entry announcement.
+
 ## 0.9.2
 
 - Show approximate saved raffle data size, raffle counts, and transfer count in Settings.
