@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.5
+
+- Recompute a Settings row's market value and Apply suggestion when an item is chosen from the name suggestions, instead of leaving the previous item's numbers in place. Rule inputs also update on change, for mobile keyboards that delay input events.
+- Suggest tickets per item when an item is worth more than the target ticket MV, such as 1 item = 60 tickets for a $300m item at a $5m target, instead of capping it at 1 ticket.
+
 ## 0.9.4
 
 - Add a Private Island prize option with a happiness selector (2,000 to 5,025) and a required island MV field in Announcement prizes. Happiness and MV appear in the announcement draft, coming soon promo, dashboard, prize list, and leadership receipt.
