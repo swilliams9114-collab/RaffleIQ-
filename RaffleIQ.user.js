@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         RaffleIQ
 // @namespace    https://github.com/swilliams9114-collab
-// @version      0.9.3
+// @version      0.9.4
 // @description  Local Torn raffle tracker and weighted drawing wheel
 // @match        https://www.torn.com/*
 // @match        https://torn.com/*
@@ -81,8 +81,11 @@
   const money = n => '$'+Math.round(n).toLocaleString('en-US');
   const receiptValue = x => Number.isSafeInteger(x.unitMV)&&x.unitMV>=0 ? x.qty*x.unitMV : null;
   const receiptTotal = r => r.receipts.reduce((sum,x)=>sum+(receiptValue(x)||0),0);
+  const ISLAND_HAPPINESS_MIN=2000,ISLAND_HAPPINESS_MAX=5025,ISLAND_HAPPINESS_STEP=25;
+  const islandHappinessOptions = () => {let out='';for(let h=ISLAND_HAPPINESS_MIN;h<=ISLAND_HAPPINESS_MAX;h+=ISLAND_HAPPINESS_STEP)out+=`<option value="${h}">${h.toLocaleString('en-US')} happiness</option>`;return out;};
   const prizeTotal = r => (r.prizeItems||[]).reduce((sum,x)=>sum+x.qty*x.unitMV,0);
-  const prizeLine = (r,place) => (r.prizeItems||[]).filter(x=>(x.place||1)===place).map(x=>`${x.qty}× ${x.name}`).join(' + ');
+  const prizeLabel = x => `${x.qty}× ${x.name}${x.kind==='island'?` (${Number(x.happiness).toLocaleString('en-US')} happiness)`:''}`;
+  const prizeLine = (r,place) => (r.prizeItems||[]).filter(x=>(x.place||1)===place).map(prizeLabel).join(' + ');
   const hostName = r => r.hostName || '_samara_';
   const hostId = r => r.hostId || '3979390';
   const missingValues = r => r.receipts.filter(x=>receiptValue(x)===null).length;
@@ -121,14 +124,14 @@
     for(let place=1;place<=PRIZE_PLACES.length;place++){
       const winner=winners[place-1],label=PRIZE_PLACES[place-1],rows=prizes.filter(x=>(x.place||1)===place),mv=rows.reduce((n,x)=>n+x.qty*x.unitMV,0);
       lines.push(`${label}: ${winner?`${displayName(winner.sender)} (ticket #${winner.ticket}; drawn ${tornTime(Math.floor(winner.drawTime/1000))})`:'No winner recorded'} | prize MV ${money(mv)}${winner?' (assigned)':' (planned)'}`);
-      for(const x of rows)lines.push(`  ${x.qty}× ${x.name} @ ${money(x.unitMV)} = ${money(x.qty*x.unitMV)}`);
+      for(const x of rows)lines.push(`  ${prizeLabel(x)} @ ${money(x.unitMV)} = ${money(x.qty*x.unitMV)}`);
       if(!rows.length)lines.push('  No prize items configured.');
     }
     lines.push(`PLANNED PRIZE MV: ${money(prizeTotal(r))}`,`ASSIGNED PRIZE MV: ${money(awardedMV)}`,`DIFFERENCE (received MV minus assigned prize MV): ${difference}`);
     if(winners.length>PRIZE_PLACES.length)lines.push(`${winners.length-PRIZE_PLACES.length} additional distinct recorded winner(s) have no configured prize place.`);
     if(recordedWinners.length>winners.length)lines.push(`${recordedWinners.length-winners.length} repeat draw result(s) for an already listed player were excluded from prize placement.`);
     if(r.issues?.length)lines.push(`REVIEW REQUIRED: ${r.issues.join('; ')}`);
-    lines.push('',`Prizes marked assigned follow the order of the first distinct recorded winners; actual item delivery is not verified by RaffleIQ. Valuations use saved Torn item catalog MV${r.mvRefreshedAt?` refreshed ${tornTime(Math.floor(r.mvRefreshedAt/1000))}`:''}; they are estimates, not sale proceeds. This receipt includes approved incoming items with this raffle's exact message code. Other incoming transfers are outside this report.`);
+    lines.push('',`Prizes marked assigned follow the order of the first distinct recorded winners; actual item delivery is not verified by RaffleIQ. Valuations use saved market values${r.mvRefreshedAt?` refreshed ${tornTime(Math.floor(r.mvRefreshedAt/1000))}`:''}; they are estimates, not sale proceeds. This receipt includes approved incoming items with this raffle's exact message code. Other incoming transfers are outside this report.`);
     return lines.join('\n');
   }
   let reportSelection=null;
@@ -144,7 +147,7 @@
   let currentTab = 'dashboard';
   function render() {
     const r = active();
-    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.9.3</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
+    panel.innerHTML = `<header class="ri-header"><span class="ri-brand">RaffleIQ <span class="ri-version">v0.9.4</span></span><button id="ri-close" aria-label="Close RaffleIQ">Close</button></header><div id="ri-status" class="muted" role="status" aria-live="polite"></div>
     <nav class="ri-tabs" aria-label="RaffleIQ sections"><button data-tab="dashboard">Dashboard</button><button data-tab="receipts">Contributions</button><button data-tab="audit">Ticket audit</button><button data-tab="participants">Participants</button><button data-tab="announcement">Announcement</button><button data-tab="draw">Draw</button><button data-tab="report">Leadership receipt</button><button data-tab="history">History</button><button data-tab="settings">Settings</button></nav><main id="ri-main"></main>`;
     panel.querySelector('#ri-close').onclick = () => panel.hidden = true;
     panel.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {status('');tab(b.dataset.tab);});
@@ -166,7 +169,7 @@
       <section class="ri-card"><h3>Market value</h3><div class="ri-money"><span>Items received${unknown?` · ${unknown} value(s) unavailable`:''}</span><strong>${money(receivedMV)}</strong></div><div class="ri-money"><span>Planned prizes</span><strong>${prizeMV?money(prizeMV):'Not set'}</strong></div>
       ${prizeMV&&!unknown&&receivedMV>=prizeMV?'<div class="ri-alert">⚠ Received item MV has reached or exceeded planned prize MV.</div>':prizeMV&&!unknown?`<p class="muted">${money(prizeMV-receivedMV)} until received item MV reaches planned prize MV.</p>`:''}
       ${PRIZE_PLACES.map((label,i)=>prizeLine(r,i+1)?`<div class="ri-prize">${label} · ${esc(prizeLine(r,i+1))}</div>`:'').join('')}
-      <p class="muted">Torn catalog estimates, not sale proceeds. ${r.mvRefreshedAt?`Updated ${new Date(r.mvRefreshedAt).toLocaleString()}.`:'Refresh to get current estimates.'}</p><button id="ri-refresh-mv">Refresh market values</button></section>
+      <p class="muted">Market value estimates, not sale proceeds. ${r.mvRefreshedAt?`Updated ${new Date(r.mvRefreshedAt).toLocaleString()}.`:'Refresh to get current estimates.'}</p><button id="ri-refresh-mv">Refresh market values</button></section>
       <section class="ri-card"><h3>Raffle controls</h3><div class="ri-actions"><button id="ri-sync">${r.finalSync?'Recheck receipts':ended?'Final sync':'Sync transfers'}</button>${ended?'':'<button id="ri-close-entries">Close entries</button>'}<button id="ri-archive" class="ri-danger">Archive raffle</button></div><p class="muted">Automatic API sync runs every five minutes while Torn is visible; it stops when TornPDA is closed.</p></section>` : `<section class="ri-card"><h3>Create a raffle</h3><div class="row"><label>Name <input id="ri-name" value="Faction raffle"></label><label>Exact message code <input id="ri-code" value="R1"></label><button id="ri-create">Create raffle</button></div></section>`;
       if (r) { m.querySelector('#ri-sync').onclick = sync;m.querySelector('#ri-refresh-mv').onclick=()=>refreshMarketValues();const audit=m.querySelector('#ri-audit-open');if(audit)audit.onclick=()=>tab('audit');const closing=m.querySelector('#ri-close-entries');if(closing)closing.onclick=()=>{if(Date.now()/1000<=startTime(r))return status('The raffle has not started yet.');if(!confirm('Close entries now? Transfers after this cutoff will not earn tickets.'))return;r.closedAt=Math.max(startTime(r),Math.floor(Date.now()/1000)-1);r.finalSync=false;save();render();}; m.querySelector('#ri-archive').onclick = () => { if (!confirm('Archive this raffle? Its receipts and drawings stay in History.')) return; r.active=false; save(); render(); }; }
       else m.querySelector('#ri-create').onclick = () => { const c=code(m.querySelector('#ri-code').value); if (!c) return status('Enter a raffle code.'); state.raffles.push({id:uid(),name:m.querySelector('#ri-name').value.trim()||'Faction raffle',code:c,hostName:'_samara_',hostId:'3979390',active:true,created:Date.now(),items:defaults.map(([name,bundle,cap])=>({name,bundle,cap})),receipts:[],draws:[]});save();render(); };
@@ -232,15 +235,35 @@
       m.querySelector('#ri-save-names').onclick=()=>{m.querySelectorAll('[data-player]').forEach(input=>{const value=input.value.trim().slice(0,40);if(value)state.names[input.dataset.player]=value;else delete state.names[input.dataset.player];});save();status('Names saved.');};
     } else if (name === 'announcement') {
       if(!r){m.innerHTML=promoMarkup()+'<p class="muted">Create a raffle to configure prizes and the full entry announcement.</p>';bindPromo(null,m);return;}
-      m.innerHTML=promoMarkup()+`<h3>Raffle announcement</h3><p class="muted">Enter dates in your device's local time. The draft displays Torn City Time (TCT).</p><div class="row"><label>Host name <input id="ri-host-name" value="${esc(hostName(r))}" autocomplete="off"></label><label>Host Torn ID <input id="ri-host-id" inputmode="numeric" value="${esc(hostId(r))}"></label></div><div class="row"><label>Extra prize details (optional) <input id="ri-prize" value="${esc(r.prize||'')}" placeholder="Any additional details?"></label><label>Starts <input id="ri-start" type="datetime-local" value="${localInputTime(startTime(r))}" ${r.receipts.length||r.closedAt?'disabled':''}></label><label>Ends <input id="ri-end" type="datetime-local" value="${r.endAt?localInputTime(r.endAt):''}" ${r.closedAt?'disabled':''}></label></div><p class="muted">${r.receipts.length?'The start is locked because transfers have already been recorded.':''}</p><button id="ri-save-details">Save details</button><h3>First through fourth place prizes</h3><p class="muted">Select a place, search for an item, enter the quantity, then tap Add prize item. All places count toward the total prize MV.</p><div id="ri-prize-items"></div><div class="row"><label>Place <select id="ri-prize-place">${PRIZE_PLACES.map((label,i)=>`<option value="${i+1}">${label}</option>`).join('')}</select></label><label>Item <input id="ri-prize-item" autocomplete="off" placeholder="Type 3 letters"><div id="ri-prize-suggestions" class="ri-suggest"></div></label><label>Quantity <input id="ri-prize-qty" type="number" min="1" step="1" value="1" style="width:80px"></label><button id="ri-add-prize">Add prize item</button></div><h3>Edit your announcement</h3><textarea id="ri-announcement"></textarea><div class="row"><button id="ri-regenerate">Regenerate draft</button><button id="ri-copy">Copy announcement</button></div><p class="muted">Regenerating replaces your edits. Copying does not post anything to Torn.</p>`;
+      m.innerHTML=promoMarkup()+`<h3>Raffle announcement</h3><p class="muted">Enter dates in your device's local time. The draft displays Torn City Time (TCT).</p><div class="row"><label>Host name <input id="ri-host-name" value="${esc(hostName(r))}" autocomplete="off"></label><label>Host Torn ID <input id="ri-host-id" inputmode="numeric" value="${esc(hostId(r))}"></label></div><div class="row"><label>Extra prize details (optional) <input id="ri-prize" value="${esc(r.prize||'')}" placeholder="Any additional details?"></label><label>Starts <input id="ri-start" type="datetime-local" value="${localInputTime(startTime(r))}" ${r.receipts.length||r.closedAt?'disabled':''}></label><label>Ends <input id="ri-end" type="datetime-local" value="${r.endAt?localInputTime(r.endAt):''}" ${r.closedAt?'disabled':''}></label></div><p class="muted">${r.receipts.length?'The start is locked because transfers have already been recorded.':''}</p><button id="ri-save-details">Save details</button><h3>First through fourth place prizes</h3><p class="muted">Select a place, then add a Torn item with a quantity or a Private Island with its happiness and market value. All places count toward the total prize MV. Torn's item catalog does not price happiness, so enter the island's MV yourself.</p><div id="ri-prize-items"></div><div class="row"><label>Place <select id="ri-prize-place">${PRIZE_PLACES.map((label,i)=>`<option value="${i+1}">${label}</option>`).join('')}</select></label><label><input id="ri-prize-island" type="checkbox"> Private Island prize</label><span id="ri-prize-island-fields" style="display:none"><label>Happiness <select id="ri-prize-happiness">${islandHappinessOptions()}</select></label><label>Island MV ($) <input id="ri-prize-island-mv" type="number" min="1" step="1" inputmode="numeric" placeholder="e.g. 450000000" style="width:130px"></label></span><span id="ri-prize-item-fields" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><label>Item <input id="ri-prize-item" autocomplete="off" placeholder="Type 3 letters"><div id="ri-prize-suggestions" class="ri-suggest"></div></label><label>Quantity <input id="ri-prize-qty" type="number" min="1" step="1" value="1" style="width:80px"></label></span><button id="ri-add-prize">Add prize</button></div><h3>Edit your announcement</h3><textarea id="ri-announcement"></textarea><div class="row"><button id="ri-regenerate">Regenerate draft</button><button id="ri-copy">Copy announcement</button></div><p class="muted">Regenerating replaces your edits. Copying does not post anything to Torn.</p>`;
       bindPromo(r,m);
       const area=m.querySelector('#ri-announcement');
       const updateDraft=()=>{if(!r.announcementEdited){area.value=announcement(r);r.announcementText=area.value;save();}};
-      const showPrizes=()=>{m.querySelector('#ri-prize-items').innerHTML=(r.prizeItems||[]).map((x,i)=>`<div class="row"><span>${PRIZE_PLACES[(x.place||1)-1]||'Prize'}: ${esc(x.name)} × ${x.qty} = ${money(x.qty*x.unitMV)}</span><button data-remove-prize="${i}">Remove</button></div>`).join('')||'<p>No prize items added.</p>';m.querySelectorAll('[data-remove-prize]').forEach(b=>b.onclick=()=>{r.prizeItems.splice(+b.dataset.removePrize,1);save();showPrizes();updateDraft();status('Prize removed; check the draft.');});};showPrizes();
-      const itemInput=m.querySelector('#ri-prize-item'),suggestions=m.querySelector('#ri-prize-suggestions');
+      const showPrizes=()=>{m.querySelector('#ri-prize-items').innerHTML=(r.prizeItems||[]).map((x,i)=>`<div class="row"><span>${PRIZE_PLACES[(x.place||1)-1]||'Prize'}: ${esc(prizeLabel(x))} = ${money(x.qty*x.unitMV)}</span><button data-remove-prize="${i}">Remove</button></div>`).join('')||'<p>No prize items added.</p>';m.querySelectorAll('[data-remove-prize]').forEach(b=>b.onclick=()=>{r.prizeItems.splice(+b.dataset.removePrize,1);save();showPrizes();updateDraft();status('Prize removed; check the draft.');});};showPrizes();
+      const itemInput=m.querySelector('#ri-prize-item'),suggestions=m.querySelector('#ri-prize-suggestions'),islandBox=m.querySelector('#ri-prize-island'),islandFields=m.querySelector('#ri-prize-island-fields'),itemFields=m.querySelector('#ri-prize-item-fields'),islandSelect=m.querySelector('#ri-prize-happiness'),qtyInput=m.querySelector('#ri-prize-qty');
+      const syncIslandFields=()=>{islandFields.style.display=islandBox.checked?'':'none';itemFields.style.display=islandBox.checked?'none':'';if(islandBox.checked){itemInput.value='';suggestions.replaceChildren();}};
+      islandBox.onchange=syncIslandFields;syncIslandFields();
       itemInput.oninput=()=>{suggestions.replaceChildren();const query=itemName(itemInput.value);if(query.length<3)return;Object.values(catalog).filter(name=>itemName(name).includes(query)).slice(0,8).forEach(name=>{const option=document.createElement('button');option.type='button';option.textContent=name;option.onclick=()=>{itemInput.value=name;suggestions.replaceChildren();};suggestions.append(option);});};
       if(!Object.keys(catalog).length){const key=localStorage.getItem(KEY);if(key)loadCatalog(key).then(()=>{if(itemInput.isConnected)itemInput.oninput();}).catch(err=>status('Prize item values unavailable: '+err.message));}
-      m.querySelector('#ri-add-prize').onclick=()=>{const name=itemInput.value.trim(),qty=Number(m.querySelector('#ri-prize-qty').value),match=Object.entries(catalog).find(([,v])=>itemName(v)===itemName(name));if(!match||!Number.isSafeInteger(qty)||qty<1)return status('Select a matching Torn item and a positive whole quantity.');const value=catalogMV[match[0]];if(!Number.isSafeInteger(value)||value<0)return status('Torn did not provide a market value for that item.');r.prizeItems||=[];r.prizeItems.push({id:match[0],name:match[1],qty,unitMV:value,place:Number(m.querySelector('#ri-prize-place').value)});save();showPrizes();updateDraft();itemInput.value='';suggestions.replaceChildren();status(r.announcementEdited?'Prize saved. Regenerate the draft to include it.':'Prize saved and draft updated.');};
+      m.querySelector('#ri-add-prize').onclick=()=>{
+        const place=Number(m.querySelector('#ri-prize-place').value);
+        r.prizeItems||=[];
+        if(islandBox.checked){
+          const happiness=Number(islandSelect.value),mv=Number(m.querySelector('#ri-prize-island-mv').value);
+          if(!Number.isSafeInteger(mv)||mv<1)return status('Enter the Private Island market value in dollars.');
+          r.prizeItems.push({kind:'island',name:'Private Island',qty:1,happiness,unitMV:mv,place});
+          save();showPrizes();updateDraft();
+          status(r.announcementEdited?'Private Island prize saved. Regenerate the draft to include it.':`Private Island with ${happiness.toLocaleString('en-US')} happiness saved and draft updated.`);
+          return;
+        }
+        const name=itemInput.value.trim(),qty=Number(qtyInput.value),match=Object.entries(catalog).find(([,v])=>itemName(v)===itemName(name));
+        if(!match||!Number.isSafeInteger(qty)||qty<1)return status('Select a matching Torn item and a positive whole quantity.');
+        const value=catalogMV[match[0]];
+        if(!Number.isSafeInteger(value)||value<0)return status('Torn did not provide a market value for that item.');
+        r.prizeItems.push({id:match[0],name:match[1],qty,unitMV:value,place});
+        save();showPrizes();updateDraft();itemInput.value='';suggestions.replaceChildren();
+        status(r.announcementEdited?'Prize saved. Regenerate the draft to include it.':'Prize saved and draft updated.');
+      };
       area.value=r.announcementEdited?r.announcementText||'':announcement(r);
       area.oninput=()=>{r.announcementText=area.value;r.announcementEdited=true;save();};
       m.querySelector('#ri-save-details').onclick=()=>{
@@ -332,12 +355,12 @@
       await loadCatalog(key);
       const byName=new Map(Object.entries(catalog).map(([id,name])=>[itemName(name),id]));
       const receipts=r.receipts.map(x=>({row:x,id:byName.get(itemName(x.item))}));
-      const prizes=(r.prizeItems||[]).map(x=>({row:x,id:catalog[x.id]?x.id:byName.get(itemName(x.name))}));
+      const prizes=(r.prizeItems||[]).filter(x=>x.kind!=='island').map(x=>({row:x,id:catalog[x.id]?x.id:byName.get(itemName(x.name))}));
       const all=[...receipts,...prizes];
       if(all.some(x=>!x.id||!Number.isSafeInteger(catalogMV[x.id])||catalogMV[x.id]<0))return status('Refresh stopped: Torn did not return an MV for every recorded item. Existing values are unchanged.');
       for(const {row,id} of receipts){row.unitMV=catalogMV[id];row.mvEstimated=true;}
       for(const {row,id} of prizes){row.unitMV=catalogMV[id];row.id=id;}
-      r.mvRefreshedAt=Date.now();save();render();if(returnTab==='report')tab('report');status('Market values refreshed from Torn. Tickets and draw history are unchanged.');
+      r.mvRefreshedAt=Date.now();save();render();if(returnTab==='report')tab('report');status(`Market values refreshed from Torn. Tickets and draw history are unchanged.${(r.prizeItems||[]).some(x=>x.kind==='island')?' Manually entered Private Island values were left as-is.':''}`);
     }catch(err){status('Market value refresh failed: '+err.message);}
     finally{refreshingMV=false;if(button?.isConnected)button.disabled=false;}
   }
