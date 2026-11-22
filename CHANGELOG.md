@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.4
+
+- Add a Private Island prize option with a happiness selector (2,000 to 5,025) and a required island MV field in Announcement prizes. Happiness and MV appear in the announcement draft, coming soon promo, dashboard, prize list, and leadership receipt.
+- Keep manually entered island MV out of catalog refreshes, so prize totals stay complete even when Torn's item catalog has no property price.
+
 ## 0.9.3
 
 - Add an editable, copyable coming soon promo in Announcement, even before a raffle is created.
